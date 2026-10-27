@@ -11,6 +11,14 @@
   <!-- Highlight.js for Code Highlighting -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+  <style>
+    /* スマホの入力時ズーム防止（16px未満だとiOSで拡大されるため） */
+    @media (max-width: 640px) {
+      input, select, textarea {
+        font-size: 16px !important;
+      }
+    }
+  </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
 
@@ -59,11 +67,11 @@
         <form id="auth-form" class="space-y-3">
           <div>
             <input type="text" id="auth-email" placeholder="ID または メールアドレス"
-              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
           </div>
           <div>
             <input type="password" id="auth-password" placeholder="パスワード"
-              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
           </div>
 
           <div id="auth-error" class="text-red-400 text-[11px] hidden"></div>
@@ -120,12 +128,16 @@
           </button>
         </div>
 
-        <!-- Search & Add -->
+        <!-- Search, Tag Management & Add -->
         <div class="flex items-center gap-2 w-full sm:w-auto">
-          <div class="relative flex-1 sm:w-56">
+          <div class="relative flex-1 sm:w-48">
             <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500"></i>
-            <input type="text" id="search-input" placeholder="キーワード検索..." class="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+            <input type="text" id="search-input" placeholder="検索..." class="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
           </div>
+          <button id="btn-manage-tags" class="bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0 border border-slate-700" title="タグの管理・編集">
+            <i data-lucide="tags" class="w-3.5 h-3.5 text-indigo-400"></i>
+            タグ管理
+          </button>
           <button id="btn-add-item" class="bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0">
             <i data-lucide="plus" class="w-3.5 h-3.5"></i>
             追加
@@ -156,9 +168,8 @@
   <div id="detail-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
       <div class="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-        <div class="flex items-center gap-2">
-          <span id="detail-category" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-indigo-950 text-indigo-400 border border-indigo-800/40"></span>
-          <h3 id="detail-title" class="font-bold text-sm text-slate-100"></h3>
+        <div class="flex items-center gap-2 min-w-0">
+          <h3 id="detail-title" class="font-bold text-sm text-slate-100 truncate"></h3>
         </div>
         <button id="btn-close-detail" class="text-slate-400 hover:text-white p-1">
           <i data-lucide="x" class="w-4 h-4"></i>
@@ -191,6 +202,27 @@
     </div>
   </div>
 
+  <!-- Tag Management Modal -->
+  <div id="tag-manage-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div class="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+        <h3 class="font-bold text-sm text-slate-100 flex items-center gap-1.5">
+          <i data-lucide="tags" class="w-4 h-4 text-indigo-400"></i> タグ一覧と編集
+        </h3>
+        <button id="btn-close-tag-modal" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+        <p class="text-[11px] text-slate-400">登録されているすべてのタグの一覧です。タグ名の変更や削除ができます。</p>
+        <div id="tag-manage-list" class="space-y-2"></div>
+      </div>
+      <div class="px-4 py-2.5 border-t border-slate-800 flex justify-end bg-slate-900/50">
+        <button id="btn-close-tag-modal-bottom" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition">閉じる</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Add/Edit Item Modal -->
   <div id="item-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-md overflow-hidden shadow-2xl">
@@ -206,35 +238,32 @@
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">データ種別</label>
-            <select id="item-type" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+            <select id="item-type" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
               <option value="compact">キー / パスワード / 短文</option>
               <option value="code">長文コード / ファイル</option>
             </select>
           </div>
           <div>
-            <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">カテゴリ / 言語</label>
-            <input type="text" id="item-category" placeholder="例: Vercel, API" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+            <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">タイトル / ファイル名</label>
+            <input type="text" id="item-title" required placeholder="例: GITHUB_TOKEN" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
           </div>
         </div>
 
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">タイトル / ファイル名</label>
-          <input type="text" id="item-title" required placeholder="例: GITHUB_TOKEN" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
-        </div>
-
-        <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">タグ (カンマ区切り)</label>
-          <input type="text" id="item-tags" placeholder="例: production, secret, frontend" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">タグ (カンマ区切り、または既存から選択)</label>
+          <input type="text" id="item-tags" placeholder="例: vercel, secret, api" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          <!-- 既存タグのサジェストチップ -->
+          <div id="existing-tags-suggestions" class="flex flex-wrap gap-1 mt-1.5"></div>
         </div>
 
         <div>
           <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">内容</label>
-          <textarea id="item-content" required rows="4" placeholder="値やコードを貼り付け" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500"></textarea>
+          <textarea id="item-content" required rows="4" placeholder="値やコードを貼り付け" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500"></textarea>
         </div>
 
         <div>
           <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">メモ (任意)</label>
-          <input type="text" id="item-memo" placeholder="補足情報" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          <input type="text" id="item-memo" placeholder="補足情報" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
         </div>
 
         <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
@@ -318,14 +347,13 @@
     const itemForm = document.getElementById('item-form');
     const itemIdInput = document.getElementById('item-id');
     const itemTypeInput = document.getElementById('item-type');
-    const itemCategoryInput = document.getElementById('item-category');
     const itemTitleInput = document.getElementById('item-title');
     const itemTagsInput = document.getElementById('item-tags');
     const itemContentInput = document.getElementById('item-content');
     const itemMemoInput = document.getElementById('item-memo');
+    const existingTagsSuggestions = document.getElementById('existing-tags-suggestions');
 
     const detailModal = document.getElementById('detail-modal');
-    const detailCategory = document.getElementById('detail-category');
     const detailTitle = document.getElementById('detail-title');
     const detailTagsContainer = document.getElementById('detail-tags-container');
     const detailMemoContainer = document.getElementById('detail-memo-container');
@@ -334,6 +362,9 @@
     const detailBtnCopy = document.getElementById('detail-btn-copy');
     const detailBtnEdit = document.getElementById('detail-btn-edit');
     const detailBtnDelete = document.getElementById('detail-btn-delete');
+
+    const tagManageModal = document.getElementById('tag-manage-modal');
+    const tagManageList = document.getElementById('tag-manage-list');
 
     function formatAuthInput(val) {
       if (!val.includes('@')) {
@@ -347,25 +378,23 @@
       loading.classList.add('hidden');
       if (user) {
         currentUser = user;
-        // ヘッダー表示名を設定 (GoogleならdisplayName、ID形式なら@前を使う)
         if (user.displayName) {
           userNameText.textContent = user.displayName;
         } else {
-          const emailPart = user.email.replace('@devvault.local', '');
-          userNameText.textContent = emailPart;
+          userNameText.textContent = user.email.replace('@devvault.local', '');
         }
         authContainer.classList.add('hidden');
         appContainer.classList.remove('hidden');
         subscribeItems();
       } else {
         currentUser = null;
+        authContainer.classList.add('hidden'); // まず一度隠してAuth表示
         authContainer.classList.remove('hidden');
         appContainer.classList.add('hidden');
       }
       lucide.createIcons();
     });
 
-    // Google Login
     btnGoogleLogin.addEventListener('click', async () => {
       authError.classList.add('hidden');
       try {
@@ -376,7 +405,6 @@
       }
     });
 
-    // Email/ID Login
     authForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       authError.classList.add('hidden');
@@ -389,7 +417,6 @@
       }
     });
 
-    // Signup
     document.getElementById('btn-signup').addEventListener('click', async () => {
       authError.classList.add('hidden');
       if(!authEmail.value || !authPassword.value) {
@@ -416,7 +443,6 @@
         items = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
-          // タグのパース処理（文字列または配列対応）
           let tags = [];
           if (Array.isArray(data.tags)) {
             tags = data.tags;
@@ -452,18 +478,23 @@
       renderItems();
     });
 
-    // タグフィルター一覧の描画
-    function renderTagFilters() {
+    // 全タグ一覧の取得
+    function getAllTags() {
       const allTags = new Set();
       items.forEach(item => {
         if (item.tags && Array.isArray(item.tags)) {
           item.tags.forEach(t => allTags.add(t));
         }
       });
+      return Array.from(allTags);
+    }
 
+    // タグフィルター一覧の描画
+    function renderTagFilters() {
+      const tags = getAllTags();
       let html = `<button onclick="filterByTag('')" class="px-2 py-1 rounded text-[11px] font-medium transition ${selectedTag === '' ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'}">すべて</button>`;
       
-      allTags.forEach(tag => {
+      tags.forEach(tag => {
         const isActive = selectedTag === tag;
         html += `<button onclick="filterByTag('${escapeJs(tag)}')" class="px-2 py-1 rounded text-[11px] font-medium transition ${isActive ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'}">#${escapeHtml(tag)}</button>`;
       });
@@ -480,7 +511,6 @@
     function renderItems() {
       const filtered = items.filter(item => {
         const matchesSearch = item.title.toLowerCase().includes(searchQuery) || 
-                              (item.category && item.category.toLowerCase().includes(searchQuery)) ||
                               (item.memo && item.memo.toLowerCase().includes(searchQuery)) ||
                               (item.tags && item.tags.some(t => t.toLowerCase().includes(searchQuery)));
         
@@ -488,7 +518,7 @@
         return matchesSearch && matchesTag;
       });
 
-      // Compact Render (Slim Rows)
+      // Compact Render
       const compactItems = filtered.filter(i => i.type === 'compact' || !i.type);
       if(compactItems.length === 0) {
         compactList.innerHTML = `<div class="py-10 text-center text-slate-600 text-xs">データがありません</div>`;
@@ -496,10 +526,9 @@
         compactList.innerHTML = compactItems.map(item => `
           <div onclick="openDetail('${item.id}')" class="bg-slate-900 hover:bg-slate-800/80 border border-slate-800 rounded-lg px-3 py-2 flex items-center justify-between cursor-pointer transition group">
             <div class="flex items-center gap-2.5 min-w-0 flex-1 mr-3">
-              <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-indigo-950/80 text-indigo-400 border border-indigo-800/40 shrink-0">${escapeHtml(item.category || 'General')}</span>
               <span class="font-bold text-xs text-slate-200 truncate shrink-0">${escapeHtml(item.title)}</span>
               <div class="hidden sm:flex items-center gap-1 shrink-0">
-                ${(item.tags || []).map(t => `<span class="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">#${escapeHtml(t)}</span>`).join('')}
+                ${(item.tags || []).map(t => `<span class="text-[9px] bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded border border-slate-700/50">#${escapeHtml(t)}</span>`).join('')}
               </div>
               <span class="text-xs font-mono text-slate-500 truncate ml-1">${escapeHtml(item.content)}</span>
             </div>
@@ -515,7 +544,7 @@
         `).join('');
       }
 
-      // Code Items Render (Slim Rows)
+      // Code Items Render
       const codeItems = filtered.filter(i => i.type === 'code');
       if(codeItems.length === 0) {
         codeList.innerHTML = `<div class="py-10 text-center text-slate-600 text-xs">長文コードが登録されていません</div>`;
@@ -527,9 +556,8 @@
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2">
                   <span class="font-bold text-xs text-slate-200 font-mono truncate">${escapeHtml(item.title)}</span>
-                  <span class="text-[10px] text-slate-500 shrink-0">${escapeHtml(item.category || '')}</span>
                   <div class="hidden sm:flex items-center gap-1">
-                    ${(item.tags || []).map(t => `<span class="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">#${escapeHtml(t)}</span>`).join('')}
+                    ${(item.tags || []).map(t => `<span class="text-[9px] bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded border border-slate-700/50">#${escapeHtml(t)}</span>`).join('')}
                   </div>
                 </div>
                 ${item.memo ? `<p class="text-[11px] text-slate-400 truncate">${escapeHtml(item.memo)}</p>` : ''}
@@ -555,12 +583,10 @@
       const item = items.find(i => i.id === id);
       if(!item) return;
       activeDetailItem = item;
-      detailCategory.textContent = item.category || 'General';
       detailTitle.textContent = item.title;
       
-      // タグ表示
       if(item.tags && item.tags.length > 0) {
-        detailTagsContainer.innerHTML = item.tags.map(t => `<span class="text-[10px] bg-slate-800 border border-slate-700 text-slate-300 px-2 py-0.5 rounded">#${escapeHtml(t)}</span>`).join('');
+        detailTagsContainer.innerHTML = item.tags.map(t => `<span class="text-[10px] bg-slate-800 border border-slate-700 text-indigo-300 px-2 py-0.5 rounded">#${escapeHtml(t)}</span>`).join('');
         detailTagsContainer.classList.remove('hidden');
       } else {
         detailTagsContainer.classList.add('hidden');
@@ -597,18 +623,101 @@
       }
     });
 
-    // Add/Edit Modal
+    // Tag Management Modal
+    document.getElementById('btn-manage-tags').addEventListener('click', () => {
+      renderTagManageList();
+      tagManageModal.classList.remove('hidden');
+    });
+
+    document.getElementById('btn-close-tag-modal').addEventListener('click', () => tagManageModal.classList.add('hidden'));
+    document.getElementById('btn-close-tag-modal-bottom').addEventListener('click', () => tagManageModal.classList.add('hidden'));
+
+    function renderTagManageList() {
+      const tags = getAllTags();
+      if(tags.length === 0) {
+        tagManageList.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">登録されているタグはありません</p>`;
+        return;
+      }
+
+      tagManageList.innerHTML = tags.map(tag => `
+        <div class="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-lg p-2.5">
+          <div class="flex items-center gap-2 flex-1 mr-2">
+            <span class="text-xs text-indigo-300 font-medium">#${escapeHtml(tag)}</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button onclick="renameTag('${escapeJs(tag)}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded transition">名称変更</button>
+            <button onclick="deleteTagGlobally('${escapeJs(tag)}')" class="px-2.5 py-1 bg-red-950/40 hover:bg-red-900/50 text-red-400 text-xs rounded transition">削除</button>
+          </div>
+        </div>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    // タグの名称変更（該当する全アイテムを走査して書き換え）
+    window.renameTag = async (oldTag) => {
+      const newTag = prompt(`「${oldTag}」の新しいタグ名を入力してください:`, oldTag);
+      if(!newTag || newTag.trim() === '' || newTag === oldTag) return;
+      const cleanNewTag = newTag.trim();
+
+      const batchPromises = items.filter(item => item.tags && item.tags.includes(oldTag)).map(async (item) => {
+        const updatedTags = item.tags.map(t => t === oldTag ? cleanNewTag : t);
+        await updateDoc(doc(db, "items", item.id), { tags: updatedTags });
+      });
+
+      await Promise.all(batchPromises);
+      if(selectedTag === oldTag) selectedTag = cleanNewTag;
+      renderTagManageList();
+      alert("タグ名を変更しました");
+    };
+
+    // タグの全削除（該当する全アイテムからこのタグを削除）
+    window.deleteTagGlobally = async (targetTag) => {
+      if(!confirm(`タグ「#${targetTag}」をすべてのデータから削除しますか？`)) return;
+
+      const batchPromises = items.filter(item => item.tags && item.tags.includes(targetTag)).map(async (item) => {
+        const updatedTags = item.tags.filter(t => t !== targetTag);
+        await updateDoc(doc(db, "items", item.id), { tags: updatedTags });
+      });
+
+      await Promise.all(batchPromises);
+      if(selectedTag === targetTag) selectedTag = '';
+      renderTagManageList();
+      alert("タグを削除しました");
+    };
+
+    // Add/Edit Item Modal
     document.getElementById('btn-add-item').addEventListener('click', () => {
       itemIdInput.value = '';
       itemForm.reset();
       itemTypeInput.value = currentTab;
       modalTitle.textContent = "新規データ追加";
+      renderExistingTagSuggestions();
       itemModal.classList.remove('hidden');
     });
 
     const closeItemModal = () => itemModal.classList.add('hidden');
     document.getElementById('btn-close-modal').addEventListener('click', closeItemModal);
     document.getElementById('btn-cancel-modal').addEventListener('click', closeItemModal);
+
+    // 入力モーダル内の既存タグサジェストチップを描画
+    function renderExistingTagSuggestions() {
+      const tags = getAllTags();
+      if(tags.length === 0) {
+        existingTagsSuggestions.innerHTML = '';
+        return;
+      }
+      existingTagsSuggestions.innerHTML = `<span class="text-[10px] text-slate-500 w-full block mb-0.5">クリックしてタグを追加:</span>` + 
+        tags.map(t => `<button type="button" onclick="appendTagToInput('${escapeJs(t)}')" class="text-[10px] bg-slate-950 hover:bg-slate-800 text-indigo-300 border border-slate-800 px-2 py-0.5 rounded transition">#${escapeHtml(t)}</button>`).join('');
+    }
+
+    window.appendTagToInput = (tag) => {
+      const currentVal = itemTagsInput.value.trim();
+      const tagsArr = currentVal ? currentVal.split(',').map(s => s.trim()).filter(Boolean) : [];
+      if(!tagsArr.includes(tag)) {
+        tagsArr.push(tag);
+        itemTagsInput.value = tagsArr.join(', ');
+      }
+    };
 
     itemForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -619,7 +728,6 @@
       const data = {
         userId: currentUser.uid,
         type: itemTypeInput.value,
-        category: itemCategoryInput.value,
         title: itemTitleInput.value,
         tags: tagsArray,
         content: itemContentInput.value,
@@ -644,12 +752,12 @@
       if(!item) return;
       itemIdInput.value = item.id;
       itemTypeInput.value = item.type || 'compact';
-      itemCategoryInput.value = item.category || '';
       itemTitleInput.value = item.title;
       itemTagsInput.value = Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || '');
       itemContentInput.value = item.content;
       itemMemoInput.value = item.memo || '';
       modalTitle.textContent = "データを編集";
+      renderExistingTagSuggestions();
       itemModal.classList.remove('hidden');
     };
 
