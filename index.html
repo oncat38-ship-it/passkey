@@ -92,7 +92,10 @@
         <span class="font-bold text-sm tracking-wide">DevVault</span>
       </div>
       <div class="flex items-center gap-3">
-        <span id="user-display" class="text-[11px] text-slate-400 font-mono bg-slate-950 px-2.5 py-1 rounded-md border border-slate-800"></span>
+        <span id="user-display" class="text-[11px] text-slate-300 font-medium bg-slate-950 px-3 py-1 rounded-md border border-slate-800 flex items-center gap-1.5">
+          <i data-lucide="user" class="w-3 h-3 text-indigo-400"></i>
+          <span id="user-name-text"></span>
+        </span>
         <button id="btn-logout" class="text-xs text-slate-400 hover:text-white flex items-center gap-1 bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-md transition">
           <i data-lucide="log-out" class="w-3 h-3"></i>
           ログアウト
@@ -121,13 +124,19 @@
         <div class="flex items-center gap-2 w-full sm:w-auto">
           <div class="relative flex-1 sm:w-56">
             <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500"></i>
-            <input type="text" id="search-input" placeholder="検索..." class="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+            <input type="text" id="search-input" placeholder="キーワード検索..." class="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
           </div>
           <button id="btn-add-item" class="bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0">
             <i data-lucide="plus" class="w-3.5 h-3.5"></i>
             追加
           </button>
         </div>
+      </div>
+
+      <!-- Tag Filter Bar -->
+      <div id="tag-filter-container" class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+        <span class="text-[10px] text-slate-500 uppercase font-semibold shrink-0 mr-1">タグ絞り込み:</span>
+        <div id="tag-filters-list" class="flex items-center gap-1.5"></div>
       </div>
 
       <!-- Compact Section (Slim List) -->
@@ -156,6 +165,7 @@
         </button>
       </div>
       <div class="p-4 space-y-3 overflow-y-auto flex-1">
+        <div id="detail-tags-container" class="hidden flex flex-wrap gap-1"></div>
         <div id="detail-memo-container" class="hidden">
           <span class="text-[10px] text-slate-500 uppercase font-semibold">メモ</span>
           <p id="detail-memo" class="text-xs text-slate-300 mt-0.5"></p>
@@ -213,8 +223,13 @@
         </div>
 
         <div>
+          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">タグ (カンマ区切り)</label>
+          <input type="text" id="item-tags" placeholder="例: production, secret, frontend" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div>
           <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">内容</label>
-          <textarea id="item-content" required rows="5" placeholder="値やコードを貼り付け" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500"></textarea>
+          <textarea id="item-content" required rows="4" placeholder="値やコードを貼り付け" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500"></textarea>
         </div>
 
         <div>
@@ -274,6 +289,7 @@
     let items = [];
     let currentTab = 'compact';
     let searchQuery = '';
+    let selectedTag = '';
     let activeDetailItem = null;
 
     // DOM
@@ -284,7 +300,7 @@
     const authEmail = document.getElementById('auth-email');
     const authPassword = document.getElementById('auth-password');
     const authError = document.getElementById('auth-error');
-    const userDisplay = document.getElementById('user-display');
+    const userNameText = document.getElementById('user-name-text');
     const btnLogout = document.getElementById('btn-logout');
     const btnGoogleLogin = document.getElementById('btn-google-login');
 
@@ -295,6 +311,7 @@
     const compactList = document.getElementById('compact-list');
     const codeList = document.getElementById('code-list');
     const searchInput = document.getElementById('search-input');
+    const tagFiltersList = document.getElementById('tag-filters-list');
 
     const itemModal = document.getElementById('item-modal');
     const modalTitle = document.getElementById('modal-title');
@@ -303,12 +320,14 @@
     const itemTypeInput = document.getElementById('item-type');
     const itemCategoryInput = document.getElementById('item-category');
     const itemTitleInput = document.getElementById('item-title');
+    const itemTagsInput = document.getElementById('item-tags');
     const itemContentInput = document.getElementById('item-content');
     const itemMemoInput = document.getElementById('item-memo');
 
     const detailModal = document.getElementById('detail-modal');
     const detailCategory = document.getElementById('detail-category');
     const detailTitle = document.getElementById('detail-title');
+    const detailTagsContainer = document.getElementById('detail-tags-container');
     const detailMemoContainer = document.getElementById('detail-memo-container');
     const detailMemo = document.getElementById('detail-memo');
     const detailContentPre = document.getElementById('detail-content-pre').querySelector('code');
@@ -328,7 +347,13 @@
       loading.classList.add('hidden');
       if (user) {
         currentUser = user;
-        userDisplay.textContent = user.email.includes('@devvault.local') ? user.email.replace('@devvault.local', '') : user.email;
+        // ヘッダー表示名を設定 (GoogleならdisplayName、ID形式なら@前を使う)
+        if (user.displayName) {
+          userNameText.textContent = user.displayName;
+        } else {
+          const emailPart = user.email.replace('@devvault.local', '');
+          userNameText.textContent = emailPart;
+        }
         authContainer.classList.add('hidden');
         appContainer.classList.remove('hidden');
         subscribeItems();
@@ -390,8 +415,17 @@
       onSnapshot(q, (snapshot) => {
         items = [];
         snapshot.forEach((doc) => {
-          items.push({ id: doc.id, ...doc.data() });
+          const data = doc.data();
+          // タグのパース処理（文字列または配列対応）
+          let tags = [];
+          if (Array.isArray(data.tags)) {
+            tags = data.tags;
+          } else if (typeof data.tags === 'string' && data.tags.trim() !== '') {
+            tags = data.tags.split(',').map(t => t.trim()).filter(Boolean);
+          }
+          items.push({ id: doc.id, ...data, tags });
         });
+        renderTagFilters();
         renderItems();
       });
     }
@@ -418,11 +452,40 @@
       renderItems();
     });
 
+    // タグフィルター一覧の描画
+    function renderTagFilters() {
+      const allTags = new Set();
+      items.forEach(item => {
+        if (item.tags && Array.isArray(item.tags)) {
+          item.tags.forEach(t => allTags.add(t));
+        }
+      });
+
+      let html = `<button onclick="filterByTag('')" class="px-2 py-1 rounded text-[11px] font-medium transition ${selectedTag === '' ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'}">すべて</button>`;
+      
+      allTags.forEach(tag => {
+        const isActive = selectedTag === tag;
+        html += `<button onclick="filterByTag('${escapeJs(tag)}')" class="px-2 py-1 rounded text-[11px] font-medium transition ${isActive ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'}">#${escapeHtml(tag)}</button>`;
+      });
+
+      tagFiltersList.innerHTML = html;
+    }
+
+    window.filterByTag = (tag) => {
+      selectedTag = tag;
+      renderTagFilters();
+      renderItems();
+    };
+
     function renderItems() {
       const filtered = items.filter(item => {
-        return item.title.toLowerCase().includes(searchQuery) || 
-               (item.category && item.category.toLowerCase().includes(searchQuery)) ||
-               (item.memo && item.memo.toLowerCase().includes(searchQuery));
+        const matchesSearch = item.title.toLowerCase().includes(searchQuery) || 
+                              (item.category && item.category.toLowerCase().includes(searchQuery)) ||
+                              (item.memo && item.memo.toLowerCase().includes(searchQuery)) ||
+                              (item.tags && item.tags.some(t => t.toLowerCase().includes(searchQuery)));
+        
+        const matchesTag = selectedTag === '' || (item.tags && item.tags.includes(selectedTag));
+        return matchesSearch && matchesTag;
       });
 
       // Compact Render (Slim Rows)
@@ -432,10 +495,13 @@
       } else {
         compactList.innerHTML = compactItems.map(item => `
           <div onclick="openDetail('${item.id}')" class="bg-slate-900 hover:bg-slate-800/80 border border-slate-800 rounded-lg px-3 py-2 flex items-center justify-between cursor-pointer transition group">
-            <div class="flex items-center gap-3 min-w-0 flex-1 mr-3">
+            <div class="flex items-center gap-2.5 min-w-0 flex-1 mr-3">
               <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-indigo-950/80 text-indigo-400 border border-indigo-800/40 shrink-0">${escapeHtml(item.category || 'General')}</span>
               <span class="font-bold text-xs text-slate-200 truncate shrink-0">${escapeHtml(item.title)}</span>
-              <span class="text-xs font-mono text-slate-500 truncate">${escapeHtml(item.content)}</span>
+              <div class="hidden sm:flex items-center gap-1 shrink-0">
+                ${(item.tags || []).map(t => `<span class="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">#${escapeHtml(t)}</span>`).join('')}
+              </div>
+              <span class="text-xs font-mono text-slate-500 truncate ml-1">${escapeHtml(item.content)}</span>
             </div>
             <div class="flex items-center gap-1 shrink-0" onclick="event.stopPropagation()">
               <button onclick="copyToClipboard('${escapeJs(item.content)}')" class="p-1.5 bg-slate-800 hover:bg-indigo-600/30 text-slate-400 hover:text-indigo-300 rounded transition" title="コピー">
@@ -462,6 +528,9 @@
                 <div class="flex items-center gap-2">
                   <span class="font-bold text-xs text-slate-200 font-mono truncate">${escapeHtml(item.title)}</span>
                   <span class="text-[10px] text-slate-500 shrink-0">${escapeHtml(item.category || '')}</span>
+                  <div class="hidden sm:flex items-center gap-1">
+                    ${(item.tags || []).map(t => `<span class="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">#${escapeHtml(t)}</span>`).join('')}
+                  </div>
                 </div>
                 ${item.memo ? `<p class="text-[11px] text-slate-400 truncate">${escapeHtml(item.memo)}</p>` : ''}
               </div>
@@ -489,6 +558,14 @@
       detailCategory.textContent = item.category || 'General';
       detailTitle.textContent = item.title;
       
+      // タグ表示
+      if(item.tags && item.tags.length > 0) {
+        detailTagsContainer.innerHTML = item.tags.map(t => `<span class="text-[10px] bg-slate-800 border border-slate-700 text-slate-300 px-2 py-0.5 rounded">#${escapeHtml(t)}</span>`).join('');
+        detailTagsContainer.classList.remove('hidden');
+      } else {
+        detailTagsContainer.classList.add('hidden');
+      }
+
       if(item.memo) {
         detailMemo.textContent = item.memo;
         detailMemoContainer.classList.remove('hidden');
@@ -536,11 +613,15 @@
     itemForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const id = itemIdInput.value;
+      const rawTags = itemTagsInput.value;
+      const tagsArray = rawTags.split(',').map(t => t.trim()).filter(Boolean);
+
       const data = {
         userId: currentUser.uid,
         type: itemTypeInput.value,
         category: itemCategoryInput.value,
         title: itemTitleInput.value,
+        tags: tagsArray,
         content: itemContentInput.value,
         memo: itemMemoInput.value,
         updatedAt: serverTimestamp()
@@ -565,6 +646,7 @@
       itemTypeInput.value = item.type || 'compact';
       itemCategoryInput.value = item.category || '';
       itemTitleInput.value = item.title;
+      itemTagsInput.value = Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || '');
       itemContentInput.value = item.content;
       itemMemoInput.value = item.memo || '';
       modalTitle.textContent = "データを編集";
