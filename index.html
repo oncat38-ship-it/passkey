@@ -145,9 +145,9 @@
         </div>
       </div>
 
-      <!-- Tag Filter Bar -->
+      <!-- Tag Filter Bar (Multiple Selection) -->
       <div id="tag-filter-container" class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-        <span class="text-[10px] text-slate-500 uppercase font-semibold shrink-0 mr-1">タグ絞り込み:</span>
+        <span class="text-[10px] text-slate-500 uppercase font-semibold shrink-0 mr-1">タグ絞り込み(複数可):</span>
         <div id="tag-filters-list" class="flex items-center gap-1.5"></div>
       </div>
 
@@ -168,25 +168,27 @@
   <div id="detail-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
       <div class="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-        <div class="flex items-center gap-2 min-w-0">
-          <h3 id="detail-title" class="font-bold text-sm text-slate-100 truncate"></h3>
-        </div>
-        <button id="btn-close-detail" class="text-slate-400 hover:text-white p-1">
+        <div id="detail-tags-header" class="flex flex-wrap gap-1 min-w-0 pr-2"></div>
+        <button id="btn-close-detail" class="text-slate-400 hover:text-white p-1 shrink-0">
           <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
       <div class="p-4 space-y-3 overflow-y-auto flex-1">
-        <div id="detail-tags-container" class="hidden flex flex-wrap gap-1"></div>
         <div id="detail-memo-container" class="hidden">
-          <span class="text-[10px] text-slate-500 uppercase font-semibold">メモ</span>
-          <p id="detail-memo" class="text-xs text-slate-300 mt-0.5"></p>
+          <span class="text-[10px] text-slate-500 uppercase font-semibold">備考欄</span>
+          <p id="detail-memo" class="text-xs text-slate-300 mt-0.5 whitespace-pre-wrap"></p>
         </div>
         <div>
           <div class="flex justify-between items-center mb-1">
             <span class="text-[10px] text-slate-500 uppercase font-semibold">内容 / 値</span>
-            <button id="detail-btn-copy" class="text-[11px] bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 px-2 py-1 rounded flex items-center gap-1 transition">
-              <i data-lucide="copy" class="w-3 h-3"></i> コピー
-            </button>
+            <div class="flex items-center gap-2">
+              <button id="detail-btn-toggle-mask" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded flex items-center gap-1 transition">
+                <i data-lucide="eye" class="w-3 h-3"></i> 表示/隠す
+              </button>
+              <button id="detail-btn-copy" class="text-[11px] bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 px-2 py-1 rounded flex items-center gap-1 transition">
+                <i data-lucide="copy" class="w-3 h-3"></i> コピー
+              </button>
+            </div>
           </div>
           <pre id="detail-content-pre" class="bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono overflow-x-auto text-slate-200 whitespace-pre-wrap max-h-96"><code></code></pre>
         </div>
@@ -235,23 +237,17 @@
       <form id="item-form" class="p-4 space-y-3">
         <input type="hidden" id="item-id">
         
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">データ種別</label>
-            <select id="item-type" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
-              <option value="compact">キー / パスワード / 短文</option>
-              <option value="code">長文コード / ファイル</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">タイトル / ファイル名</label>
-            <input type="text" id="item-title" required placeholder="例: GITHUB_TOKEN" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
-          </div>
+        <div>
+          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">データ種別</label>
+          <select id="item-type" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+            <option value="compact">キー / パスワード / 短文</option>
+            <option value="code">長文コード / ファイル</option>
+          </select>
         </div>
 
         <div>
           <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">タグ (カンマ区切り、または既存から選択)</label>
-          <input type="text" id="item-tags" placeholder="例: vercel, secret, api" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          <input type="text" id="item-tags" required placeholder="例: vercel, secret, api" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
           <!-- 既存タグのサジェストチップ -->
           <div id="existing-tags-suggestions" class="flex flex-wrap gap-1 mt-1.5"></div>
         </div>
@@ -262,8 +258,8 @@
         </div>
 
         <div>
-          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">メモ (任意)</label>
-          <input type="text" id="item-memo" placeholder="補足情報" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">備考欄</label>
+          <textarea id="item-memo" rows="2" placeholder="詳細情報や用途などを記入" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500"></textarea>
         </div>
 
         <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
@@ -318,8 +314,9 @@
     let items = [];
     let currentTab = 'compact';
     let searchQuery = '';
-    let selectedTag = '';
+    let selectedTags = new Set(); // 複数選択タグ用
     let activeDetailItem = null;
+    let isMasked = true; // キー等の目隠し状態
 
     // DOM
     const loading = document.getElementById('loading');
@@ -347,19 +344,18 @@
     const itemForm = document.getElementById('item-form');
     const itemIdInput = document.getElementById('item-id');
     const itemTypeInput = document.getElementById('item-type');
-    const itemTitleInput = document.getElementById('item-title');
     const itemTagsInput = document.getElementById('item-tags');
     const itemContentInput = document.getElementById('item-content');
     const itemMemoInput = document.getElementById('item-memo');
     const existingTagsSuggestions = document.getElementById('existing-tags-suggestions');
 
     const detailModal = document.getElementById('detail-modal');
-    const detailTitle = document.getElementById('detail-title');
-    const detailTagsContainer = document.getElementById('detail-tags-container');
+    const detailTagsHeader = document.getElementById('detail-tags-header');
     const detailMemoContainer = document.getElementById('detail-memo-container');
     const detailMemo = document.getElementById('detail-memo');
     const detailContentPre = document.getElementById('detail-content-pre').querySelector('code');
     const detailBtnCopy = document.getElementById('detail-btn-copy');
+    const detailBtnToggleMask = document.getElementById('detail-btn-toggle-mask');
     const detailBtnEdit = document.getElementById('detail-btn-edit');
     const detailBtnDelete = document.getElementById('detail-btn-delete');
 
@@ -388,7 +384,6 @@
         subscribeItems();
       } else {
         currentUser = null;
-        authContainer.classList.add('hidden'); // まず一度隠してAuth表示
         authContainer.classList.remove('hidden');
         appContainer.classList.add('hidden');
       }
@@ -489,33 +484,48 @@
       return Array.from(allTags);
     }
 
-    // タグフィルター一覧の描画
+    // タグフィルター一覧の描画（複数選択対応）
     function renderTagFilters() {
       const tags = getAllTags();
-      let html = `<button onclick="filterByTag('')" class="px-2 py-1 rounded text-[11px] font-medium transition ${selectedTag === '' ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'}">すべて</button>`;
+      const allSelected = selectedTags.size === 0;
+
+      let html = `<button onclick="toggleTagFilter('ALL')" class="px-2 py-1 rounded text-[11px] font-medium transition ${allSelected ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'}">すべて</button>`;
       
       tags.forEach(tag => {
-        const isActive = selectedTag === tag;
-        html += `<button onclick="filterByTag('${escapeJs(tag)}')" class="px-2 py-1 rounded text-[11px] font-medium transition ${isActive ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'}">#${escapeHtml(tag)}</button>`;
+        const isSelected = selectedTags.has(tag);
+        html += `<button onclick="toggleTagFilter('${escapeJs(tag)}')" class="px-2 py-1 rounded text-[11px] font-medium transition ${isSelected ? 'bg-indigo-600 text-white shadow' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'}">#${escapeHtml(tag)}</button>`;
       });
 
       tagFiltersList.innerHTML = html;
     }
 
-    window.filterByTag = (tag) => {
-      selectedTag = tag;
+    window.toggleTagFilter = (tag) => {
+      if (tag === 'ALL') {
+        selectedTags.clear();
+      } else {
+        if (selectedTags.has(tag)) {
+          selectedTags.delete(tag);
+        } else {
+          selectedTags.add(tag);
+        }
+      }
       renderTagFilters();
       renderItems();
     };
 
     function renderItems() {
       const filtered = items.filter(item => {
-        const matchesSearch = item.title.toLowerCase().includes(searchQuery) || 
+        const matchesSearch = item.content.toLowerCase().includes(searchQuery) || 
                               (item.memo && item.memo.toLowerCase().includes(searchQuery)) ||
                               (item.tags && item.tags.some(t => t.toLowerCase().includes(searchQuery)));
         
-        const matchesTag = selectedTag === '' || (item.tags && item.tags.includes(selectedTag));
-        return matchesSearch && matchesTag;
+        // 複数選択されたタグのすべてを含んでいるか (AND条件)
+        let matchesTags = true;
+        if (selectedTags.size > 0) {
+          matchesTags = Array.from(selectedTags).every(t => item.tags && item.tags.includes(t));
+        }
+
+        return matchesSearch && matchesTags;
       });
 
       // Compact Render
@@ -523,25 +533,31 @@
       if(compactItems.length === 0) {
         compactList.innerHTML = `<div class="py-10 text-center text-slate-600 text-xs">データがありません</div>`;
       } else {
-        compactList.innerHTML = compactItems.map(item => `
-          <div onclick="openDetail('${item.id}')" class="bg-slate-900 hover:bg-slate-800/80 border border-slate-800 rounded-lg px-3 py-2 flex items-center justify-between cursor-pointer transition group">
-            <div class="flex items-center gap-2.5 min-w-0 flex-1 mr-3">
-              <span class="font-bold text-xs text-slate-200 truncate shrink-0">${escapeHtml(item.title)}</span>
-              <div class="hidden sm:flex items-center gap-1 shrink-0">
-                ${(item.tags || []).map(t => `<span class="text-[9px] bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded border border-slate-700/50">#${escapeHtml(t)}</span>`).join('')}
+        compactList.innerHTML = compactItems.map(item => {
+          const maskedContent = isMasked ? '••••••••••••••••' : item.content;
+          return `
+            <div onclick="openDetail('${item.id}')" class="bg-slate-900 hover:bg-slate-800/80 border border-slate-800 rounded-lg px-3 py-2 flex items-center justify-between cursor-pointer transition group">
+              <div class="flex items-center gap-2.5 min-w-0 flex-1 mr-3">
+                <div class="flex items-center gap-1 shrink-0">
+                  ${(item.tags || []).map(t => `<span class="text-[10px] bg-indigo-950/80 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800/50 font-medium">#${escapeHtml(t)}</span>`).join('')}
+                </div>
+                <span class="text-xs font-mono text-slate-400 truncate ml-1">${escapeHtml(maskedContent)}</span>
+                ${item.memo ? `<span class="text-[11px] text-slate-500 truncate hidden md:inline ml-2">(${escapeHtml(item.memo)})</span>` : ''}
               </div>
-              <span class="text-xs font-mono text-slate-500 truncate ml-1">${escapeHtml(item.content)}</span>
+              <div class="flex items-center gap-1 shrink-0" onclick="event.stopPropagation()">
+                <button onclick="toggleMaskGlobal(event)" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded transition" title="表示/隠す切替">
+                  <i data-lucide="${isMasked ? 'eye' : 'eye-off'}" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="copyToClipboard('${escapeJs(item.content)}')" class="p-1.5 bg-slate-800 hover:bg-indigo-600/30 text-slate-400 hover:text-indigo-300 rounded transition" title="コピー">
+                  <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="openDetail('${item.id}')" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded transition" title="詳細">
+                  <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
             </div>
-            <div class="flex items-center gap-1 shrink-0" onclick="event.stopPropagation()">
-              <button onclick="copyToClipboard('${escapeJs(item.content)}')" class="p-1.5 bg-slate-800 hover:bg-indigo-600/30 text-slate-400 hover:text-indigo-300 rounded transition" title="コピー">
-                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-              </button>
-              <button onclick="openDetail('${item.id}')" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded transition" title="詳細">
-                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
-              </button>
-            </div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
       }
 
       // Code Items Render
@@ -554,10 +570,9 @@
             <div class="flex items-center gap-3 min-w-0 flex-1 mr-3">
               <i data-lucide="file-code" class="w-4 h-4 text-indigo-400 shrink-0"></i>
               <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2">
-                  <span class="font-bold text-xs text-slate-200 font-mono truncate">${escapeHtml(item.title)}</span>
-                  <div class="hidden sm:flex items-center gap-1">
-                    ${(item.tags || []).map(t => `<span class="text-[9px] bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded border border-slate-700/50">#${escapeHtml(t)}</span>`).join('')}
+                <div class="flex items-center gap-2 mb-0.5">
+                  <div class="flex items-center gap-1">
+                    ${(item.tags || []).map(t => `<span class="text-[10px] bg-indigo-950/80 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800/50 font-medium">#${escapeHtml(t)}</span>`).join('')}
                   </div>
                 </div>
                 ${item.memo ? `<p class="text-[11px] text-slate-400 truncate">${escapeHtml(item.memo)}</p>` : ''}
@@ -578,18 +593,23 @@
       lucide.createIcons();
     }
 
+    // 全体のマスク切り替え
+    window.toggleMaskGlobal = (e) => {
+      e.stopPropagation();
+      isMasked = !isMasked;
+      renderItems();
+    };
+
     // Detail Modal Control
     window.openDetail = (id) => {
       const item = items.find(i => i.id === id);
       if(!item) return;
       activeDetailItem = item;
-      detailTitle.textContent = item.title;
       
       if(item.tags && item.tags.length > 0) {
-        detailTagsContainer.innerHTML = item.tags.map(t => `<span class="text-[10px] bg-slate-800 border border-slate-700 text-indigo-300 px-2 py-0.5 rounded">#${escapeHtml(t)}</span>`).join('');
-        detailTagsContainer.classList.remove('hidden');
+        detailTagsHeader.innerHTML = item.tags.map(t => `<span class="text-[11px] bg-indigo-950 border border-indigo-800/60 text-indigo-300 px-2.5 py-0.5 rounded font-medium">#${escapeHtml(t)}</span>`).join('');
       } else {
-        detailTagsContainer.classList.add('hidden');
+        detailTagsHeader.innerHTML = '';
       }
 
       if(item.memo) {
@@ -609,6 +629,17 @@
 
     detailBtnCopy.addEventListener('click', () => {
       if(activeDetailItem) copyToClipboard(activeDetailItem.content);
+    });
+
+    detailBtnToggleMask.addEventListener('click', () => {
+      if(detailContentPre.classList.contains('security-masked')) {
+        detailContentPre.classList.remove('security-masked', 'blur-sm', 'select-none');
+        detailBtnToggleMask.innerHTML = `<i data-lucide="eye-off" class="w-3 h-3"></i> 隠す`;
+      } else {
+        detailContentPre.classList.add('security-masked', 'blur-sm', 'select-none');
+        detailBtnToggleMask.innerHTML = `<i data-lucide="eye" class="w-3 h-3"></i> 表示`;
+      }
+      lucide.createIcons();
     });
 
     detailBtnEdit.addEventListener('click', () => {
@@ -653,7 +684,6 @@
       lucide.createIcons();
     }
 
-    // タグの名称変更（該当する全アイテムを走査して書き換え）
     window.renameTag = async (oldTag) => {
       const newTag = prompt(`「${oldTag}」の新しいタグ名を入力してください:`, oldTag);
       if(!newTag || newTag.trim() === '' || newTag === oldTag) return;
@@ -665,12 +695,14 @@
       });
 
       await Promise.all(batchPromises);
-      if(selectedTag === oldTag) selectedTag = cleanNewTag;
+      if(selectedTags.has(oldTag)) {
+        selectedTags.delete(oldTag);
+        selectedTags.add(cleanNewTag);
+      }
       renderTagManageList();
       alert("タグ名を変更しました");
     };
 
-    // タグの全削除（該当する全アイテムからこのタグを削除）
     window.deleteTagGlobally = async (targetTag) => {
       if(!confirm(`タグ「#${targetTag}」をすべてのデータから削除しますか？`)) return;
 
@@ -680,7 +712,7 @@
       });
 
       await Promise.all(batchPromises);
-      if(selectedTag === targetTag) selectedTag = '';
+      selectedTags.delete(targetTag);
       renderTagManageList();
       alert("タグを削除しました");
     };
@@ -699,7 +731,6 @@
     document.getElementById('btn-close-modal').addEventListener('click', closeItemModal);
     document.getElementById('btn-cancel-modal').addEventListener('click', closeItemModal);
 
-    // 入力モーダル内の既存タグサジェストチップを描画
     function renderExistingTagSuggestions() {
       const tags = getAllTags();
       if(tags.length === 0) {
@@ -728,7 +759,6 @@
       const data = {
         userId: currentUser.uid,
         type: itemTypeInput.value,
-        title: itemTitleInput.value,
         tags: tagsArray,
         content: itemContentInput.value,
         memo: itemMemoInput.value,
@@ -752,7 +782,6 @@
       if(!item) return;
       itemIdInput.value = item.id;
       itemTypeInput.value = item.type || 'compact';
-      itemTitleInput.value = item.title;
       itemTagsInput.value = Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || '');
       itemContentInput.value = item.content;
       itemMemoInput.value = item.memo || '';
