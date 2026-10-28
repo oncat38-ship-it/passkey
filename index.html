@@ -30,7 +30,7 @@
   <!-- Loading Screen -->
   <div id="loading" class="fixed inset-0 bg-slate-950 z-50 flex flex-col items-center justify-center gap-3">
     <div class="animate-spin rounded-full h-10 w-10 border-2 border-indigo-500 border-t-transparent"></div>
-    <span class="text-xs text-slate-400">データを読み込み中...</span>
+    <span id="loading-text" class="text-xs text-slate-400">データを読み込み中...</span>
   </div>
 
   <!-- Auth View -->
@@ -85,13 +85,6 @@
             </button>
           </div>
         </form>
-
-        <!-- 緊急データ初期化ボタン -->
-        <div class="pt-4 border-t border-slate-800/80 text-center">
-          <button id="btn-emergency-reset" class="text-[10px] text-red-400/80 hover:text-red-300 underline">
-            画面がフリーズして開けない場合の緊急データリセット
-          </button>
-        </div>
       </div>
     </div>
   </div>
@@ -106,7 +99,11 @@
         </div>
         <span class="font-bold text-sm tracking-wide">DevVault</span>
       </div>
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2">
+        <!-- Googleログイン時でも使える緊急データリセットボタン -->
+        <button id="btn-emergency-reset-inapp" class="text-[10px] bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800 px-2.5 py-1 rounded-md transition flex items-center gap-1" title="フリーズの原因となるデータを一括削除します">
+          <i data-lucide="trash-2" class="w-3 h-3"></i> 緊急リセット
+        </button>
         <span id="user-display" class="text-[11px] text-slate-300 font-medium bg-slate-950 px-3 py-1 rounded-md border border-slate-800 flex items-center gap-1.5">
           <i data-lucide="user" class="w-3 h-3 text-indigo-400"></i>
           <span id="user-name-text"></span>
@@ -344,6 +341,7 @@
 
     // DOM
     const loading = document.getElementById('loading');
+    const loadingText = document.getElementById('loading-text');
     const authContainer = document.getElementById('auth-container');
     const appContainer = document.getElementById('app-container');
     const authForm = document.getElementById('auth-form');
@@ -353,7 +351,7 @@
     const userNameText = document.getElementById('user-name-text');
     const btnLogout = document.getElementById('btn-logout');
     const btnGoogleLogin = document.getElementById('btn-google-login');
-    const btnEmergencyReset = document.getElementById('btn-emergency-reset');
+    const btnEmergencyResetInApp = document.getElementById('btn-emergency-reset-inapp');
 
     const tabCompact = document.getElementById('tab-compact');
     const tabCode = document.getElementById('tab-code');
@@ -458,27 +456,24 @@
       }
     });
 
-    // 緊急データクリア機能
-    btnEmergencyReset.addEventListener('click', async () => {
-      if(!confirm("【注意】異常データを一括削除してアカウントを修復しますか？")) return;
-      const emailInput = prompt("修復対象のアカウントID/メールアドレスを入力してください:");
-      if(!emailInput) return;
-      const passInput = prompt("パスワードを入力してください:");
-      if(!passInput) return;
+    // ログイン中の画面からワンクリックでデータを全削除（初期化）できる緊急リセット
+    btnEmergencyResetInApp.addEventListener('click', async () => {
+      if(!currentUser) return;
+      if(!confirm("【注意】フリーズの原因となっているアカウント内の全データを削除して初期化しますか？")) return;
 
       try {
+        loadingText.textContent = "データを修復・クリア中...";
         loading.classList.remove('hidden');
-        const formatted = formatAuthInput(emailInput);
-        const res = await signInWithEmailAndPassword(auth, formatted, passInput);
-        const q = query(collection(db, "items"), where("userId", "==", res.user.uid));
+        
+        const q = query(collection(db, "items"), where("userId", "==", currentUser.uid));
         const snap = await getDocs(q);
         const deletePromises = snap.docs.map(d => deleteDoc(doc(db, "items", d.id)));
         await Promise.all(deletePromises);
-        alert("アカウントデータを正常に修復・クリアしました。再度ログインしてください。");
+        
+        alert("データを正常にリセットしました。アプリを再読み込みします。");
         location.reload();
       } catch(err) {
         alert("リセット失敗: " + err.message);
-      } finally {
         loading.classList.add('hidden');
       }
     });
@@ -487,8 +482,15 @@
 
     function subscribeItems() {
       if (!currentUser) return;
-      const q = query(collection(db, "items"), where("userId", "==", currentUser.uid));
-      onSnapshot(q, (snapshot) => {
+      
+      // 安全タイムアウト：もしFirestoreの同期が5秒以上かかったら強制的にローディングを解除する
+      const loadTimer = setTimeout(() => {
+        loading.classList.add('hidden');
+      }, 5000);
+
+      onSnapshot(q = query(collection(db, "items"), where("userId", "==", currentUser.uid)), (snapshot) => {
+        clearTimeout(loadTimer);
+        loading.classList.add('hidden');
         items = [];
         snapshot.forEach((doc) => {
           try {
@@ -507,6 +509,8 @@
         renderTagFilters();
         renderItems();
       }, (error) => {
+        clearTimeout(loadTimer);
+        loading.classList.add('hidden');
         console.error("Firestore Error:", error);
       });
     }
@@ -914,9 +918,10 @@
       } catch (err) {
         console.error("保存エラー:", err);
         alert("保存に失敗しました: " + err.message);
-      } font-medium
-      btnSubmitItem.disabled = false;
-      btnSubmitItem.textContent = "保存";
+      } finally {
+        btnSubmitItem.disabled = false;
+        btnSubmitItem.textContent = "保存";
+      }
     });
 
     window.editItem = (id) => {
