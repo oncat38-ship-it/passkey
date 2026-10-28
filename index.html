@@ -251,7 +251,7 @@
           </select>
         </div>
 
-        <!-- ファイル名 & ファイルアップロード領域 (長文コード選択時のみ表示) -->
+        <!-- ファイル名 & ファイルアップロード領域 -->
         <div id="file-fields-container" class="space-y-3 hidden">
           <div>
             <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">ファイルから読み込み (任意)</label>
@@ -281,7 +281,7 @@
 
         <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
           <button type="button" id="btn-cancel-modal" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition">キャンセル</button>
-          <button type="submit" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition">保存</button>
+          <button type="submit" id="btn-submit-item" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition">保存</button>
         </div>
       </form>
     </div>
@@ -368,6 +368,7 @@
     const itemContentInput = document.getElementById('item-content');
     const itemMemoInput = document.getElementById('item-memo');
     const existingTagsSuggestions = document.getElementById('existing-tags-suggestions');
+    const btnSubmitItem = document.getElementById('btn-submit-item');
 
     const detailModal = document.getElementById('detail-modal');
     const detailFilenameBadge = document.getElementById('detail-filename-badge');
@@ -468,6 +469,8 @@
         });
         renderTagFilters();
         renderItems();
+      }, (error) => {
+        console.error("Firestore同期エラー:", error);
       });
     }
 
@@ -620,7 +623,6 @@
       renderItems();
     };
 
-    // ファイルとしてダウンロードする機能
     window.downloadItemFile = (id) => {
       const item = items.find(i => i.id === id);
       if(!item || !item.content) return;
@@ -697,8 +699,12 @@
 
     detailBtnDelete.addEventListener('click', async () => {
       if(activeDetailItem && confirm("この項目を削除しますか？")) {
-        await deleteDoc(doc(db, "items", activeDetailItem.id));
-        detailModal.classList.add('hidden');
+        try {
+          await deleteDoc(doc(db, "items", activeDetailItem.id));
+          detailModal.classList.add('hidden');
+        } catch(err) {
+          alert("削除に失敗しました: " + err.message);
+        }
       }
     });
 
@@ -737,32 +743,40 @@
       if(!newTag || newTag.trim() === '' || newTag === oldTag) return;
       const cleanNewTag = newTag.trim();
 
-      const batchPromises = items.filter(item => item.tags && item.tags.includes(oldTag)).map(async (item) => {
-        const updatedTags = item.tags.map(t => t === oldTag ? cleanNewTag : t);
-        await updateDoc(doc(db, "items", item.id), { tags: updatedTags });
-      });
+      try {
+        const batchPromises = items.filter(item => item.tags && item.tags.includes(oldTag)).map(async (item) => {
+          const updatedTags = item.tags.map(t => t === oldTag ? cleanNewTag : t);
+          await updateDoc(doc(db, "items", item.id), { tags: updatedTags });
+        });
 
-      await Promise.all(batchPromises);
-      if(selectedTags.has(oldTag)) {
-        selectedTags.delete(oldTag);
-        selectedTags.add(cleanNewTag);
+        await Promise.all(batchPromises);
+        if(selectedTags.has(oldTag)) {
+          selectedTags.delete(oldTag);
+          selectedTags.add(cleanNewTag);
+        }
+        renderTagManageList();
+        alert("タグ名を変更しました");
+      } catch(err) {
+        alert("タグ名変更に失敗しました: " + err.message);
       }
-      renderTagManageList();
-      alert("タグ名を変更しました");
     };
 
     window.deleteTagGlobally = async (targetTag) => {
       if(!confirm(`タグ「#${targetTag}」をすべてのデータから削除しますか？`)) return;
 
-      const batchPromises = items.filter(item => item.tags && item.tags.includes(targetTag)).map(async (item) => {
-        const updatedTags = item.tags.filter(t => t !== targetTag);
-        await updateDoc(doc(db, "items", item.id), { tags: updatedTags });
-      });
+      try {
+        const batchPromises = items.filter(item => item.tags && item.tags.includes(targetTag)).map(async (item) => {
+          const updatedTags = item.tags.filter(t => t !== targetTag);
+          await updateDoc(doc(db, "items", item.id), { tags: updatedTags });
+        });
 
-      await Promise.all(batchPromises);
-      selectedTags.delete(targetTag);
-      renderTagManageList();
-      alert("タグを削除しました");
+        await Promise.all(batchPromises);
+        selectedTags.delete(targetTag);
+        renderTagManageList();
+        alert("タグを削除しました");
+      } catch(err) {
+        alert("タグ削除に失敗しました: " + err.message);
+      }
     };
 
     // Add/Edit Item Modal
@@ -792,7 +806,6 @@
       }
     }
 
-    // ファイルアップロード時の自動読み込み処理
     fileUploadInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if(!file) return;
@@ -827,8 +840,11 @@
       }
     };
 
+    // 保存処理（二重クリック防止＆エラーハンドリング追加）
     itemForm.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if(!currentUser) return;
+
       const id = itemIdInput.value;
       const type = itemTypeInput.value;
       const rawTags = itemTagsInput.value;
@@ -844,6 +860,9 @@
         updatedAt: serverTimestamp()
       };
 
+      btnSubmitItem.disabled = true;
+      btnSubmitItem.textContent = "保存中...";
+
       try {
         if(id) {
           await updateDoc(doc(db, "items", id), data);
@@ -852,7 +871,11 @@
         }
         closeItemModal();
       } catch (err) {
-        alert("保存失敗: " + err.message);
+        console.error("保存エラー:", err);
+        alert("保存に失敗しました。Firestoreのルールやネットワーク接続を確認してください。\n詳細: " + err.message);
+      } finally {
+        btnSubmitItem.disabled = false;
+        btnSubmitItem.textContent = "保存";
       }
     });
 
