@@ -8,11 +8,10 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- Highlight.js for Code Highlighting -->
+  <!-- Highlight.js -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
   <style>
-    /* スマホの入力時ズーム防止 */
     @media (max-width: 640px) {
       input, select, textarea {
         font-size: 16px !important;
@@ -29,8 +28,9 @@
   </div>
 
   <!-- Loading Screen -->
-  <div id="loading" class="fixed inset-0 bg-slate-950 z-50 flex items-center justify-center">
+  <div id="loading" class="fixed inset-0 bg-slate-950 z-50 flex flex-col items-center justify-center gap-3">
     <div class="animate-spin rounded-full h-10 w-10 border-2 border-indigo-500 border-t-transparent"></div>
+    <span class="text-xs text-slate-400">データを読み込み中...</span>
   </div>
 
   <!-- Auth View -->
@@ -85,6 +85,13 @@
             </button>
           </div>
         </form>
+
+        <!-- 緊急データ初期化ボタン -->
+        <div class="pt-4 border-t border-slate-800/80 text-center">
+          <button id="btn-emergency-reset" class="text-[10px] text-red-400/80 hover:text-red-300 underline">
+            画面がフリーズして開けない場合の緊急データリセット
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -145,18 +152,18 @@
         </div>
       </div>
 
-      <!-- Tag Filter Bar (Multiple Selection) -->
+      <!-- Tag Filter Bar -->
       <div id="tag-filter-container" class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-        <span class="text-[10px] text-slate-500 uppercase font-semibold shrink-0 mr-1">タグ絞り込み(複数可):</span>
+        <span class="text-[10px] text-slate-500 uppercase font-semibold shrink-0 mr-1">タグ絞り込み:</span>
         <div id="tag-filters-list" class="flex items-center gap-1.5"></div>
       </div>
 
-      <!-- Compact Section (Slim List) -->
+      <!-- Compact Section -->
       <section id="section-compact" class="space-y-1.5">
         <div id="compact-list" class="space-y-1.5"></div>
       </section>
 
-      <!-- Code Snippet Section (Slim List) -->
+      <!-- Code Snippet Section -->
       <section id="section-code" class="hidden space-y-1.5">
         <div id="code-list" class="space-y-1.5"></div>
       </section>
@@ -196,7 +203,7 @@
               </button>
             </div>
           </div>
-          <pre id="detail-content-pre" class="bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono overflow-x-auto text-slate-200 whitespace-pre-wrap max-h-96"><code></code></pre>
+          <pre id="detail-content-pre" class="bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono overflow-x-auto text-slate-200 whitespace-pre-wrap max-h-96"><code id="detail-code-block"></code></pre>
         </div>
       </div>
       <div class="px-4 py-2.5 border-t border-slate-800 flex justify-end gap-2 bg-slate-900/50">
@@ -222,7 +229,7 @@
         </button>
       </div>
       <div class="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
-        <p class="text-[11px] text-slate-400">登録されているすべてのタグの一覧です。タグ名の変更や削除ができます。</p>
+        <p class="text-[11px] text-slate-400">登録されているすべてのタグの一覧です。</p>
         <div id="tag-manage-list" class="space-y-2"></div>
       </div>
       <div class="px-4 py-2.5 border-t border-slate-800 flex justify-end bg-slate-900/50">
@@ -251,15 +258,14 @@
           </select>
         </div>
 
-        <!-- ファイル名 & ファイルアップロード領域 -->
         <div id="file-fields-container" class="space-y-3 hidden">
           <div>
-            <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">ファイルから読み込み (任意)</label>
-            <input type="file" id="file-upload-input" class="w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700 cursor-pointer">
+            <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">テキストファイルから読み込み (任意)</label>
+            <input type="file" id="file-upload-input" accept=".txt,.html,.css,.js,.json,.py,.md,.yml,.xml" class="w-full text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700 cursor-pointer">
           </div>
           <div>
             <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">ファイル名 / 拡張子</label>
-            <input type="text" id="item-filename" placeholder="例: index.js, config.json" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500">
+            <input type="text" id="item-filename" placeholder="例: index.html, config.json" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500">
           </div>
         </div>
 
@@ -271,7 +277,7 @@
 
         <div>
           <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1" id="content-label-text">内容</label>
-          <textarea id="item-content" required rows="5" placeholder="値やコードを直接貼り付け、またはファイルをアップロード" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500"></textarea>
+          <textarea id="item-content" required rows="5" placeholder="値やコードを貼り付け" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500"></textarea>
         </div>
 
         <div>
@@ -305,6 +311,7 @@
       addDoc, 
       updateDoc, 
       deleteDoc, 
+      getDocs,
       doc, 
       query, 
       where, 
@@ -346,6 +353,7 @@
     const userNameText = document.getElementById('user-name-text');
     const btnLogout = document.getElementById('btn-logout');
     const btnGoogleLogin = document.getElementById('btn-google-login');
+    const btnEmergencyReset = document.getElementById('btn-emergency-reset');
 
     const tabCompact = document.getElementById('tab-compact');
     const tabCode = document.getElementById('tab-code');
@@ -375,7 +383,7 @@
     const detailTagsHeader = document.getElementById('detail-tags-header');
     const detailMemoContainer = document.getElementById('detail-memo-container');
     const detailMemo = document.getElementById('detail-memo');
-    const detailContentPre = document.getElementById('detail-content-pre').querySelector('code');
+    const detailCodeBlock = document.getElementById('detail-code-block');
     const detailBtnCopy = document.getElementById('detail-btn-copy');
     const detailBtnDownload = document.getElementById('detail-btn-download');
     const detailBtnToggleMask = document.getElementById('detail-btn-toggle-mask');
@@ -450,6 +458,31 @@
       }
     });
 
+    // 緊急データクリア機能
+    btnEmergencyReset.addEventListener('click', async () => {
+      if(!confirm("【注意】異常データを一括削除してアカウントを修復しますか？")) return;
+      const emailInput = prompt("修復対象のアカウントID/メールアドレスを入力してください:");
+      if(!emailInput) return;
+      const passInput = prompt("パスワードを入力してください:");
+      if(!passInput) return;
+
+      try {
+        loading.classList.remove('hidden');
+        const formatted = formatAuthInput(emailInput);
+        const res = await signInWithEmailAndPassword(auth, formatted, passInput);
+        const q = query(collection(db, "items"), where("userId", "==", res.user.uid));
+        const snap = await getDocs(q);
+        const deletePromises = snap.docs.map(d => deleteDoc(doc(db, "items", d.id)));
+        await Promise.all(deletePromises);
+        alert("アカウントデータを正常に修復・クリアしました。再度ログインしてください。");
+        location.reload();
+      } catch(err) {
+        alert("リセット失敗: " + err.message);
+      } finally {
+        loading.classList.add('hidden');
+      }
+    });
+
     btnLogout.addEventListener('click', () => signOut(auth));
 
     function subscribeItems() {
@@ -458,19 +491,23 @@
       onSnapshot(q, (snapshot) => {
         items = [];
         snapshot.forEach((doc) => {
-          const data = doc.data();
-          let tags = [];
-          if (Array.isArray(data.tags)) {
-            tags = data.tags;
-          } else if (typeof data.tags === 'string' && data.tags.trim() !== '') {
-            tags = data.tags.split(',').map(t => t.trim()).filter(Boolean);
+          try {
+            const data = doc.data();
+            let tags = [];
+            if (Array.isArray(data.tags)) {
+              tags = data.tags;
+            } else if (typeof data.tags === 'string' && data.tags.trim() !== '') {
+              tags = data.tags.split(',').map(t => t.trim()).filter(Boolean);
+            }
+            items.push({ id: doc.id, ...data, tags, content: data.content || '' });
+          } catch(e) {
+            console.error("データ解析スキップ", e);
           }
-          items.push({ id: doc.id, ...data, tags });
         });
         renderTagFilters();
         renderItems();
       }, (error) => {
-        console.error("Firestore同期エラー:", error);
+        console.error("Firestore Error:", error);
       });
     }
 
@@ -535,7 +572,8 @@
 
     function renderItems() {
       const filtered = items.filter(item => {
-        const matchesSearch = item.content.toLowerCase().includes(searchQuery) || 
+        const contentStr = (item.content || '').toLowerCase();
+        const matchesSearch = contentStr.includes(searchQuery) || 
                               (item.filename && item.filename.toLowerCase().includes(searchQuery)) ||
                               (item.memo && item.memo.toLowerCase().includes(searchQuery)) ||
                               (item.tags && item.tags.some(t => t.toLowerCase().includes(searchQuery)));
@@ -665,8 +703,11 @@
         detailMemoContainer.classList.add('hidden');
       }
 
-      detailContentPre.textContent = item.content;
-      hljs.highlightElement(detailContentPre);
+      detailCodeBlock.textContent = item.content || '';
+      try {
+        hljs.highlightElement(detailCodeBlock);
+      } catch(e){}
+      
       detailModal.classList.remove('hidden');
       lucide.createIcons();
     };
@@ -682,11 +723,12 @@
     });
 
     detailBtnToggleMask.addEventListener('click', () => {
-      if(detailContentPre.classList.contains('security-masked')) {
-        detailContentPre.classList.remove('security-masked', 'blur-sm', 'select-none');
+      const pre = document.getElementById('detail-content-pre');
+      if(pre.classList.contains('security-masked')) {
+        pre.classList.remove('security-masked', 'blur-sm', 'select-none');
         detailBtnToggleMask.innerHTML = `<i data-lucide="eye-off" class="w-3 h-3"></i> 隠す`;
       } else {
-        detailContentPre.classList.add('security-masked', 'blur-sm', 'select-none');
+        pre.classList.add('security-masked', 'blur-sm', 'select-none');
         detailBtnToggleMask.innerHTML = `<i data-lucide="eye" class="w-3 h-3"></i> 表示`;
       }
       lucide.createIcons();
@@ -840,7 +882,6 @@
       }
     };
 
-    // 保存処理（二重クリック防止＆エラーハンドリング追加）
     itemForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       if(!currentUser) return;
@@ -872,11 +913,10 @@
         closeItemModal();
       } catch (err) {
         console.error("保存エラー:", err);
-        alert("保存に失敗しました。Firestoreのルールやネットワーク接続を確認してください。\n詳細: " + err.message);
-      } finally {
-        btnSubmitItem.disabled = false;
-        btnSubmitItem.textContent = "保存";
-      }
+        alert("保存に失敗しました: " + err.message);
+      } font-medium
+      btnSubmitItem.disabled = false;
+      btnSubmitItem.textContent = "保存";
     });
 
     window.editItem = (id) => {
@@ -888,7 +928,7 @@
       itemFilenameInput.value = item.filename || '';
       fileUploadInput.value = '';
       itemTagsInput.value = Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || '');
-      itemContentInput.value = item.content;
+      itemContentInput.value = item.content || '';
       itemMemoInput.value = item.memo || '';
       modalTitle.textContent = "データを編集";
       renderExistingTagSuggestions();
@@ -905,13 +945,13 @@
 
     function escapeHtml(str) {
       if(!str) return '';
-      return str.replace(/[&<>"']/g, function(m) {
+      return String(str).replace(/[&<>"']/g, function(m) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
       });
     }
     function escapeJs(str) {
       if(!str) return '';
-      return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+      return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
     }
   </script>
 </body>
