@@ -3,1054 +3,811 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PassKey Locker - パスワード＆サイトマネージャー</title>
-  <!-- Google Fonts & FontAwesome -->
-  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <!-- Firebase SDK (v9 compat) -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-  
-  <!-- QR Code Library (QRCode.js) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-
+  <title>DevVault - Keys & Code Manager</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Highlight.js for Code Highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
   <style>
-    :root {
-      --bg-color: #fcf8f6;
-      --card-bg: #ffffff;
-      --primary: #f28b82;
-      --primary-hover: #e57373;
-      --accent: #a7d7c5;
-      --text-main: #5f5755;
-      --text-sub: #9e9490;
-      --border-color: #f0e6e2;
-      --shadow: 0 2px 10px rgba(220, 200, 195, 0.2);
+    /* スマホの入力時ズーム防止（16px未満だとiOSで拡大されるため） */
+    @media (max-width: 640px) {
+      input, select, textarea {
+        font-size: 16px !important;
+      }
     }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'M PLUS Rounded 1c', sans-serif;
-    }
-
-    body {
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      padding: 12px;
-    }
-
-    .container {
-      width: 100%;
-      max-width: 980px;
-    }
-
-    /* ヘッダー */
-    header {
-      text-align: center;
-      margin-bottom: 10px;
-    }
-
-    header h1 {
-      font-size: 1.25rem;
-      color: var(--primary);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
-
-    /* 認証用カード */
-    .auth-card {
-      max-width: 380px;
-      margin: 30px auto;
-      background: var(--card-bg);
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: var(--shadow);
-      border: 1px solid var(--border-color);
-    }
-
-    /* フォーム要素 */
-    .form-group {
-      margin-bottom: 10px;
-    }
-
-    .form-group label {
-      display: block;
-      font-size: 0.78rem;
-      font-weight: 500;
-      color: var(--text-sub);
-      margin-bottom: 3px;
-    }
-
-    input[type="text"], input[type="password"], input[type="url"], select {
-      width: 100%;
-      padding: 8px 12px;
-      border: 1.5px solid var(--border-color);
-      border-radius: 10px;
-      font-size: 0.85rem;
-      color: var(--text-main);
-      outline: none;
-      background-color: #fffaf8;
-      transition: all 0.2s;
-    }
-
-    input:focus, select:focus {
-      border-color: var(--primary);
-      background-color: #fff;
-    }
-
-    /* ボタン */
-    .btn {
-      width: 100%;
-      padding: 8px 12px;
-      border: none;
-      border-radius: 10px;
-      font-size: 0.85rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: transform 0.1s, background-color 0.2s;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
-
-    .btn:active {
-      transform: scale(0.98);
-    }
-
-    .btn-primary {
-      background-color: var(--primary);
-      color: #fff;
-    }
-
-    .btn-primary:hover {
-      background-color: var(--primary-hover);
-    }
-
-    .btn-secondary {
-      background-color: var(--accent);
-      color: #fff;
-    }
-
-    .btn-google {
-      background-color: #fff;
-      color: #555;
-      border: 1.5px solid var(--border-color);
-    }
-
-    .btn-sm {
-      padding: 4px 8px;
-      font-size: 0.75rem;
-      border-radius: 6px;
-      width: auto;
-    }
-
-    /* タブ切り替え（ログイン用） */
-    .auth-tabs {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-
-    .auth-tab {
-      flex: 1;
-      text-align: center;
-      padding: 6px;
-      font-size: 0.8rem;
-      border-radius: 8px;
-      cursor: pointer;
-      background: #f7ebe6;
-      color: var(--text-sub);
-      font-weight: 700;
-    }
-
-    .auth-tab.active {
-      background: var(--primary);
-      color: white;
-    }
-
-    /* コントロールバー */
-    .top-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #fbf0ec;
-      border-radius: 12px;
-      padding: 8px 14px;
-      margin-bottom: 10px;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .user-info {
-      font-size: 0.82rem;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .btn-logout {
-      background: none;
-      border: none;
-      color: var(--primary);
-      font-weight: 700;
-      cursor: pointer;
-      font-size: 0.78rem;
-    }
-
-    /* カスタムカテゴリ/タブバー */
-    .category-bar-wrapper {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 12px;
-      overflow-x: auto;
-      padding-bottom: 4px;
-    }
-
-    .category-tabs {
-      display: flex;
-      gap: 6px;
-      flex-grow: 1;
-    }
-
-    .cat-tab {
-      padding: 6px 14px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      border-radius: 20px;
-      background: #ffffff;
-      color: var(--text-sub);
-      border: 1px solid var(--border-color);
-      cursor: pointer;
-      white-space: nowrap;
-      transition: all 0.2s;
-    }
-
-    .cat-tab.active {
-      background: var(--primary);
-      color: #fff;
-      border-color: var(--primary);
-    }
-
-    .cat-manage-btn {
-      background: #fff;
-      border: 1px solid var(--border-color);
-      color: var(--text-sub);
-      border-radius: 50%;
-      width: 30px;
-      height: 30px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      flex-shrink: 0;
-    }
-
-    .cat-manage-btn:hover {
-      color: var(--primary);
-    }
-
-    /* グリッドレイアウト（一画面コンパクト化） */
-    .items-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 10px;
-    }
-
-    /* 各サイトカード */
-    .item-card {
-      background: #fff;
-      border-radius: 12px;
-      padding: 10px 12px;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 2px 6px rgba(220, 200, 195, 0.12);
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      position: relative;
-    }
-
-    .item-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 6px;
-    }
-
-    .item-title-area {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      overflow: hidden;
-    }
-
-    .item-badge {
-      font-size: 0.65rem;
-      padding: 2px 6px;
-      border-radius: 10px;
-      background: #f7ebe6;
-      color: var(--primary);
-      font-weight: bold;
-      white-space: nowrap;
-    }
-
-    .item-title {
-      font-weight: 700;
-      font-size: 0.9rem;
-      color: var(--text-main);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .item-actions {
-      display: flex;
-      gap: 2px;
-    }
-
-    .icon-btn {
-      background: none;
-      border: none;
-      color: var(--text-sub);
-      cursor: pointer;
-      font-size: 0.82rem;
-      padding: 3px 5px;
-      border-radius: 4px;
-    }
-
-    .icon-btn:hover {
-      color: var(--primary);
-      background-color: #fcf8f6;
-    }
-
-    .item-details {
-      font-size: 0.78rem;
-      display: grid;
-      gap: 4px;
-    }
-
-    .detail-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: #fcf8f6;
-      padding: 4px 8px;
-      border-radius: 6px;
-      gap: 4px;
-    }
-
-    .detail-val {
-      font-family: monospace;
-      font-size: 0.8rem;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      flex-grow: 1;
-      margin: 0 4px;
-    }
-
-    .copy-btn {
-      border: none;
-      background: #f28b8220;
-      color: var(--primary);
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 0.72rem;
-      cursor: pointer;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
-
-    .copy-btn:hover {
-      background: var(--primary);
-      color: #fff;
-    }
-
-    /* モーダル */
-    .modal-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(95, 87, 85, 0.4);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s;
-      z-index: 100;
-      padding: 16px;
-    }
-
-    .modal-overlay.active {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .modal {
-      background: white;
-      border-radius: 16px;
-      padding: 20px;
-      width: 100%;
-      max-width: 360px;
-      text-align: center;
-      box-shadow: var(--shadow);
-    }
-
-    .qr-container {
-      display: flex;
-      justify-content: center;
-      margin: 12px 0;
-    }
-
-    .qr-container img, .qr-container canvas {
-      border-radius: 8px;
-      padding: 6px;
-      background: white;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    }
-
-    /* クイックアシスト/ランチャー モーダルスタイル */
-    .launcher-box {
-      background: #fcf8f6;
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 12px;
-      margin: 10px 0;
-      text-align: left;
-    }
-
-    .launcher-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 8px;
-      background: #fff;
-      padding: 6px 10px;
-      border-radius: 8px;
-    }
-
-    .toast {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(95, 87, 85, 0.9);
-      color: #fff;
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      z-index: 200;
-      opacity: 0;
-      transition: opacity 0.3s;
-      pointer-events: none;
-    }
-    .toast.show { opacity: 1; }
-
-    .hidden { display: none !important; }
   </style>
 </head>
-<body>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
 
-<div class="container">
-  <header>
-    <h1><i class="fa-solid fa-key"></i> PassKey Locker</h1>
-  </header>
-
-  <!-- トースト通知 -->
-  <div id="toast" class="toast">コピーしました！</div>
-
-  <!-- 認証画面 -->
-  <div id="auth-section" class="auth-card">
-    <div class="auth-tabs">
-      <div class="auth-tab active" onclick="switchAuthTab('login')">ログイン</div>
-      <div class="auth-tab" onclick="switchAuthTab('register')">新規登録</div>
-    </div>
-
-    <form id="auth-form" onsubmit="handleAuth(event)">
-      <div class="form-group">
-        <label><i class="fa-solid fa-user"></i> ユーザーID</label>
-        <input type="text" id="auth-id" placeholder="例: myname" required autocomplete="username">
-      </div>
-      <div class="form-group">
-        <label><i class="fa-solid fa-lock"></i> パスワード</label>
-        <input type="password" id="auth-pass" placeholder="6文字以上" required autocomplete="current-password">
-      </div>
-      <button type="submit" id="auth-submit-btn" class="btn btn-primary" style="margin-top: 6px;">
-        ログイン
-      </button>
-    </form>
-
-    <div style="text-align: center; margin: 10px 0 6px; font-size: 0.72rem; color: var(--text-sub);">または</div>
-
-    <button class="btn btn-google" onclick="handleGoogleAuth()">
-      <i class="fa-brands fa-google" style="color:#4285F4;"></i> Googleでログイン
-    </button>
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50 flex items-center gap-2 text-xs">
+    <i data-lucide="check-circle" class="w-4 h-4"></i>
+    <span id="toast-message">クリップボードにコピーしました</span>
   </div>
 
-  <!-- メインコンテンツ（ログイン後） -->
-  <div id="app-section" class="hidden">
-    <!-- コントロールバー -->
-    <div class="top-bar">
-      <div class="user-info">
-        <i class="fa-solid fa-circle-user" style="color:var(--primary);"></i>
-        <span><strong id="user-display-name">ユーザー</strong> さん</span>
+  <!-- Loading Screen -->
+  <div id="loading" class="fixed inset-0 bg-slate-950 z-50 flex items-center justify-center">
+    <div class="animate-spin rounded-full h-10 w-10 border-2 border-indigo-500 border-t-transparent"></div>
+  </div>
+
+  <!-- Auth View -->
+  <div id="auth-container" class="hidden flex-1 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-sm">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="p-2.5 bg-indigo-600/20 text-indigo-400 rounded-lg">
+          <i data-lucide="shield-check" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold">DevVault</h1>
+          <p class="text-xs text-slate-400">キー・コード管理</p>
+        </div>
       </div>
-      <div style="display: flex; gap: 8px; align-items: center;">
-        <button class="btn btn-primary" onclick="openAddModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">
-          <i class="fa-solid fa-plus"></i> 新しいサイトを追加
+
+      <div class="space-y-4">
+        <!-- Google Login Button -->
+        <button id="btn-google-login" class="w-full bg-white hover:bg-slate-100 text-slate-800 font-medium py-2.5 px-4 rounded-lg transition text-xs flex items-center justify-center gap-2 shadow">
+          <svg class="w-4 h-4" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+          Googleでログイン
         </button>
-        <button class="btn-logout" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> ログアウト</button>
-      </div>
-    </div>
 
-    <!-- カスタムカテゴリ/タブバー -->
-    <div class="category-bar-wrapper">
-      <div class="category-tabs" id="category-tabs-container">
-        <!-- 動的にタブが差し込まれます -->
-      </div>
-      <button class="cat-manage-btn" onclick="openCatManageModal()" title="タブの編集">
-        <i class="fa-solid fa-gear"></i>
-      </button>
-    </div>
+        <div class="relative flex py-2 items-center">
+          <div class="flex-grow border-t border-slate-800"></div>
+          <span class="flex-shrink mx-4 text-slate-500 text-[10px] uppercase">またはID / メール</span>
+          <div class="flex-grow border-t border-slate-800"></div>
+        </div>
 
-    <!-- サイト一覧 (グリッド表示) -->
-    <div id="items-list" class="items-grid">
-      <!-- 動的にカードが挿入されます -->
+        <form id="auth-form" class="space-y-3">
+          <div>
+            <input type="text" id="auth-email" placeholder="ID または メールアドレス"
+              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <input type="password" id="auth-password" placeholder="パスワード"
+              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          </div>
+
+          <div id="auth-error" class="text-red-400 text-[11px] hidden"></div>
+
+          <div class="pt-1 flex gap-2">
+            <button type="submit" id="btn-login" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-lg transition text-xs">
+              ログイン
+            </button>
+            <button type="button" id="btn-signup" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2 rounded-lg transition text-xs">
+              新規登録
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- データ登録・編集モーダル -->
-<div id="add-modal" class="modal-overlay">
-  <div class="modal">
-    <h3 id="modal-title" style="margin-bottom: 12px; color: var(--primary); font-size: 1rem;">新しいサイトを追加</h3>
-    <form onsubmit="saveItem(event)">
-      <input type="hidden" id="item-doc-id">
-      <div class="form-group" style="text-align: left;">
-        <label>サービス名 / サイト名</label>
-        <input type="text" id="item-title" placeholder="例: X (Twitter)" required>
+  <!-- Main App View -->
+  <div id="app-container" class="hidden flex-1 flex flex-col">
+    <!-- Header -->
+    <header class="bg-slate-900/80 backdrop-blur border-b border-slate-800 sticky top-0 z-40 px-4 sm:px-6 py-2.5 flex justify-between items-center">
+      <div class="flex items-center gap-2.5">
+        <div class="p-1.5 bg-indigo-600/20 text-indigo-400 rounded-lg">
+          <i data-lucide="key-round" class="w-4 h-4"></i>
+        </div>
+        <span class="font-bold text-sm tracking-wide">DevVault</span>
       </div>
-      <div class="form-group" style="text-align: left;">
-        <label>タブ (カテゴリ)</label>
-        <select id="item-category" required>
-          <!-- 動的にカテゴリ選択肢が差し込まれます -->
-        </select>
-      </div>
-      <div class="form-group" style="text-align: left;">
-        <label>URL</label>
-        <input type="url" id="item-url" placeholder="https://example.com" required>
-      </div>
-      <div class="form-group" style="text-align: left;">
-        <label>ID / ユーザー名</label>
-        <input type="text" id="item-username" placeholder="例: user@example.com" required>
-      </div>
-      <div class="form-group" style="text-align: left;">
-        <label>パスワード</label>
-        <input type="text" id="item-password" placeholder="パスワード" required>
-      </div>
-      <div style="display: flex; gap: 8px; margin-top: 14px;">
-        <button type="button" class="btn btn-google" style="margin:0;" onclick="closeAddModal()">キャンセル</button>
-        <button type="submit" class="btn btn-primary">保存</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- タブ（カテゴリ）管理モーダル -->
-<div id="cat-modal" class="modal-overlay">
-  <div class="modal">
-    <h3 style="margin-bottom: 12px; color: var(--primary); font-size: 1rem;">タブ（カテゴリ）の管理</h3>
-    <div class="form-group" style="display: flex; gap: 6px;">
-      <input type="text" id="new-cat-input" placeholder="新しいタブ名 (例: SNS)">
-      <button class="btn btn-primary btn-sm" onclick="addCategory()" style="width: auto; flex-shrink: 0;">追加</button>
-    </div>
-    <div id="cat-list-container" style="max-height: 200px; overflow-y: auto; text-align: left; margin-bottom: 12px;">
-      <!-- カテゴリ一覧 -->
-    </div>
-    <button class="btn btn-google" style="margin:0; font-size: 0.82rem;" onclick="closeCatManageModal()">閉じる</button>
-  </div>
-</div>
-
-<!-- ジャンプ先ヘルパー/QRモーダル -->
-<div id="launcher-modal" class="modal-overlay">
-  <div class="modal">
-    <h3 style="color: var(--primary); font-size: 1rem;" id="launcher-modal-title">サイトへの移動アシスト</h3>
-    <p style="font-size: 0.75rem; color: var(--text-sub); margin-top: 2px;">IDとパスワードをコピーして移動できます</p>
-
-    <div class="launcher-box">
-      <div class="launcher-row">
-        <span style="font-size: 0.7rem; color: var(--text-sub);">ID:</span>
-        <span class="detail-val" id="launch-id-val">---</span>
-        <button class="copy-btn" onclick="copyLauncherText('id')">コピー</button>
-      </div>
-      <div class="launcher-row">
-        <span style="font-size: 0.7rem; color: var(--text-sub);">PASS:</span>
-        <span class="detail-val" id="launch-pass-val">••••••••</span>
-        <button class="icon-btn" style="padding:0 2px; margin-right:4px;" onclick="toggleLauncherPass()">
-          <i class="fa-solid fa-eye" id="launch-pass-icon"></i>
+      <div class="flex items-center gap-3">
+        <span id="user-display" class="text-[11px] text-slate-300 font-medium bg-slate-950 px-3 py-1 rounded-md border border-slate-800 flex items-center gap-1.5">
+          <i data-lucide="user" class="w-3 h-3 text-indigo-400"></i>
+          <span id="user-name-text"></span>
+        </span>
+        <button id="btn-logout" class="text-xs text-slate-400 hover:text-white flex items-center gap-1 bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-md transition">
+          <i data-lucide="log-out" class="w-3 h-3"></i>
+          ログアウト
         </button>
-        <button class="copy-btn" onclick="copyLauncherText('pass')">コピー</button>
       </div>
-    </div>
+    </header>
 
-    <!-- QRコード -->
-    <div class="qr-container">
-      <div id="qrcode"></div>
-    </div>
+    <!-- Content Area -->
+    <main class="flex-1 max-w-5xl w-full mx-auto p-3 sm:p-6 space-y-4">
+      
+      <!-- Top Action Bar -->
+      <div class="flex flex-col sm:flex-row justify-between gap-3 items-center">
+        <!-- Navigation Tabs -->
+        <div class="flex bg-slate-900 p-1 rounded-lg border border-slate-800 w-full sm:w-auto">
+          <button id="tab-compact" class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-indigo-600 text-white transition">
+            <i data-lucide="shield" class="w-3.5 h-3.5"></i>
+            キー・短文
+          </button>
+          <button id="tab-code" class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md text-slate-400 hover:text-white transition">
+            <i data-lucide="code-2" class="w-3.5 h-3.5"></i>
+            長文コード・ファイル
+          </button>
+        </div>
 
-    <a id="launch-direct-link" href="#" target="_blank" class="btn btn-primary" style="text-decoration: none; margin-bottom: 6px; font-size: 0.85rem;">
-      <i class="fa-solid fa-arrow-up-right-from-square"></i> サイトを開く
-    </a>
-    <button class="btn btn-google" style="margin:0; font-size: 0.82rem;" onclick="closeLauncherModal()">閉じる</button>
+        <!-- Search, Tag Management & Add -->
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <div class="relative flex-1 sm:w-48">
+            <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500"></i>
+            <input type="text" id="search-input" placeholder="検索..." class="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          </div>
+          <button id="btn-manage-tags" class="bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0 border border-slate-700" title="タグの管理・編集">
+            <i data-lucide="tags" class="w-3.5 h-3.5 text-indigo-400"></i>
+            タグ管理
+          </button>
+          <button id="btn-add-item" class="bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            追加
+          </button>
+        </div>
+      </div>
+
+      <!-- Tag Filter Bar (Multiple Selection) -->
+      <div id="tag-filter-container" class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+        <span class="text-[10px] text-slate-500 uppercase font-semibold shrink-0 mr-1">タグ絞り込み(複数可):</span>
+        <div id="tag-filters-list" class="flex items-center gap-1.5"></div>
+      </div>
+
+      <!-- Compact Section (Slim List) -->
+      <section id="section-compact" class="space-y-1.5">
+        <div id="compact-list" class="space-y-1.5"></div>
+      </section>
+
+      <!-- Code Snippet Section (Slim List) -->
+      <section id="section-code" class="hidden space-y-1.5">
+        <div id="code-list" class="space-y-1.5"></div>
+      </section>
+
+    </main>
   </div>
-</div>
 
-<script>
-  // Firebase 設定情報
-  const firebaseConfig = {
-    apiKey: "AIzaSyAoNZm6KwPQuWbC0W65sOh4soLMx1UoUrQ",
-    authDomain: "g-account-6f48b.firebaseapp.com",
-    projectId: "g-account-6f48b",
-    storageBucket: "g-account-6f48b.firebasestorage.app",
-    messagingSenderId: "719634797870",
-    appId: "1:719634797870:web:5e6c3affbed118aa8d16bf",
-    measurementId: "G-0WB2ZMX6K1"
-  };
-
-  // 初期化 & オフラインキャッシュ有効化（データの消滅対策）
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
-
-  db.enablePersistence().catch(err => {
-    console.log("Persistence error:", err.code);
-  });
-
-  let authMode = 'login';
-  let qrcodeObj = null;
-  let currentTab = 'ALL';
-  let userCategories = ['仕事', 'プライベート', 'SNS', '買い物'];
-  let currentLaunchingData = null;
-
-  // ユーザーID入力の表記揺れ防止（大文字小文字・スペース統一）
-  function idToEmail(userUniqueId) {
-    const cleanId = userUniqueId.trim().toLowerCase();
-    return `${cleanId}@app.internal`;
-  }
-
-  // タブ切り替え（ログイン用）
-  function switchAuthTab(mode) {
-    authMode = mode;
-    const tabs = document.querySelectorAll('.auth-tab');
-    tabs[0].classList.toggle('active', mode === 'login');
-    tabs[1].classList.toggle('active', mode === 'register');
-    document.getElementById('auth-submit-btn').innerText = mode === 'login' ? 'ログイン' : '新規登録';
-  }
-
-  // ログイン / 新規登録 処理
-  async function handleAuth(e) {
-    e.preventDefault();
-    const rawId = document.getElementById('auth-id').value;
-    const passVal = document.getElementById('auth-pass').value;
-    const email = idToEmail(rawId);
-
-    try {
-      if (authMode === 'register') {
-        const res = await auth.createUserWithEmailAndPassword(email, passVal);
-        await res.user.updateProfile({ displayName: rawId.trim() });
-      } else {
-        await auth.signInWithEmailAndPassword(email, passVal);
-      }
-    } catch (err) {
-      alert('エラー: ' + getFriendlyErrMsg(err.code));
-    }
-  }
-
-  // Google ログイン
-  async function handleGoogleAuth() {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    try {
-      await auth.signInWithPopup(provider);
-    } catch (err) {
-      alert('Googleログインエラー: ' + err.message);
-    }
-  }
-
-  // ログアウト
-  function logout() {
-    auth.signOut();
-  }
-
-  function getFriendlyErrMsg(code) {
-    switch (code) {
-      case 'auth/user-not-found': return 'ユーザーが見つかりません。IDを確認してください。';
-      case 'auth/wrong-password': return 'パスワードが違います。';
-      case 'auth/email-already-in-use': return 'このユーザーIDは既に登録されています。';
-      case 'auth/weak-password': return 'パスワードは6文字以上にしてください。';
-      default: return '認証エラーが発生しました (' + code + ')';
-    }
-  }
-
-  // 認証状態の監視
-  auth.onAuthStateChanged(user => {
-    if (user) {
-      document.getElementById('auth-section').classList.add('hidden');
-      document.getElementById('app-section').classList.remove('hidden');
-      document.getElementById('user-display-name').innerText = user.displayName || user.email.split('@')[0];
-      loadUserCategories(user.uid);
-      loadItems(user.uid);
-    } else {
-      document.getElementById('auth-section').classList.remove('hidden');
-      document.getElementById('app-section').classList.add('hidden');
-      document.getElementById('items-list').innerHTML = '';
-    }
-  });
-
-  // ユーザーカテゴリ（タブ）の読み込み & 同期
-  function loadUserCategories(uid) {
-    db.collection('users').doc(uid).collection('settings').doc('categories')
-      .onSnapshot(doc => {
-        if (doc.exists && doc.data().list) {
-          userCategories = doc.data().list;
-        } else {
-          // 初期タブを保存
-          db.collection('users').doc(uid).collection('settings').doc('categories').set({
-            list: userCategories
-          });
-        }
-        renderCategoryTabs();
-      });
-  }
-
-  // カテゴリタブの描画
-  function renderCategoryTabs() {
-    const container = document.getElementById('category-tabs-container');
-    container.innerHTML = '';
-
-    // 「すべて」タブ
-    const allTab = document.createElement('div');
-    allTab.className = `cat-tab ${currentTab === 'ALL' ? 'active' : ''}`;
-    allTab.innerText = 'すべて';
-    allTab.onclick = () => selectCategoryTab('ALL');
-    container.appendChild(allTab);
-
-    // カスタムタブ
-    userCategories.forEach(cat => {
-      const tab = document.createElement('div');
-      tab.className = `cat-tab ${currentTab === cat ? 'active' : ''}`;
-      tab.innerText = cat;
-      tab.onclick = () => selectCategoryTab(cat);
-      container.appendChild(tab);
-    });
-
-    // モーダル内のセレクトボックスも同期
-    const select = document.getElementById('item-category');
-    select.innerHTML = '';
-    userCategories.forEach(cat => {
-      const opt = document.createElement('option');
-      opt.value = cat;
-      opt.innerText = cat;
-      select.appendChild(opt);
-    });
-  }
-
-  function selectCategoryTab(cat) {
-    currentTab = cat;
-    renderCategoryTabs();
-    if (auth.currentUser) {
-      loadItems(auth.currentUser.uid);
-    }
-  }
-
-  // サイト一覧のリアルタイム取得
-  function loadItems(uid) {
-    db.collection('users').doc(uid).collection('accounts')
-      .orderBy('createdAt', 'desc')
-      .onSnapshot(snapshot => {
-        const listEl = document.getElementById('items-list');
-        listEl.innerHTML = '';
-
-        if (snapshot.empty) {
-          listEl.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:30px; color:var(--text-sub); font-size:0.85rem;">登録されているサイトがありません 🌸</div>';
-          return;
-        }
-
-        let count = 0;
-        snapshot.forEach(doc => {
-          const item = doc.data();
-          const itemCat = item.category || '未分類';
-
-          // タブフィルター
-          if (currentTab !== 'ALL' && itemCat !== currentTab) return;
-
-          count++;
-          const card = document.createElement('div');
-          card.className = 'item-card';
-          card.innerHTML = `
-            <div class="item-header">
-              <div class="item-title-area">
-                <span class="item-badge">${escapeHtml(itemCat)}</span>
-                <span class="item-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</span>
-              </div>
-              <div class="item-actions">
-                <button class="icon-btn" title="サイトを開く・アシスト" onclick="openLauncherModal('${escapeHtml(item.url)}', '${escapeHtml(item.title)}', '${escapeHtml(item.username)}', '${escapeHtml(item.password)}')"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
-                <button class="icon-btn" title="QRコード" onclick="openLauncherModal('${escapeHtml(item.url)}', '${escapeHtml(item.title)}', '${escapeHtml(item.username)}', '${escapeHtml(item.password)}')"><i class="fa-solid fa-qrcode"></i></button>
-                <button class="icon-btn" title="編集" onclick="editItem('${doc.id}', '${escapeHtml(item.title)}', '${escapeHtml(itemCat)}', '${escapeHtml(item.url)}', '${escapeHtml(item.username)}', '${escapeHtml(item.password)}')"><i class="fa-solid fa-pen"></i></button>
-                <button class="icon-btn" title="削除" onclick="deleteItem('${doc.id}')"><i class="fa-solid fa-trash"></i></button>
-              </div>
+  <!-- Detail / View Modal -->
+  <div id="detail-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+      <div class="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+        <div id="detail-tags-header" class="flex flex-wrap gap-1 min-w-0 pr-2"></div>
+        <button id="btn-close-detail" class="text-slate-400 hover:text-white p-1 shrink-0">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="p-4 space-y-3 overflow-y-auto flex-1">
+        <div id="detail-memo-container" class="hidden">
+          <span class="text-[10px] text-slate-500 uppercase font-semibold">備考欄</span>
+          <p id="detail-memo" class="text-xs text-slate-300 mt-0.5 whitespace-pre-wrap"></p>
+        </div>
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-[10px] text-slate-500 uppercase font-semibold">内容 / 値</span>
+            <div class="flex items-center gap-2">
+              <button id="detail-btn-toggle-mask" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded flex items-center gap-1 transition">
+                <i data-lucide="eye" class="w-3 h-3"></i> 表示/隠す
+              </button>
+              <button id="detail-btn-copy" class="text-[11px] bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 px-2 py-1 rounded flex items-center gap-1 transition">
+                <i data-lucide="copy" class="w-3 h-3"></i> コピー
+              </button>
             </div>
-            <div class="item-details">
-              <div class="detail-row">
-                <span style="color:var(--text-sub); font-size:0.7rem;">ID</span>
-                <span class="detail-val" title="${escapeHtml(item.username)}">${escapeHtml(item.username)}</span>
-                <button class="copy-btn" onclick="copyText('${escapeHtml(item.username)}')">コピー</button>
+          </div>
+          <pre id="detail-content-pre" class="bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono overflow-x-auto text-slate-200 whitespace-pre-wrap max-h-96"><code></code></pre>
+        </div>
+      </div>
+      <div class="px-4 py-2.5 border-t border-slate-800 flex justify-end gap-2 bg-slate-900/50">
+        <button id="detail-btn-edit" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium transition flex items-center gap-1">
+          <i data-lucide="pencil" class="w-3 h-3"></i> 編集
+        </button>
+        <button id="detail-btn-delete" class="px-3 py-1.5 bg-red-950/40 hover:bg-red-900/50 text-red-400 rounded-lg text-xs font-medium transition flex items-center gap-1">
+          <i data-lucide="trash-2" class="w-3 h-3"></i> 削除
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tag Management Modal -->
+  <div id="tag-manage-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div class="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+        <h3 class="font-bold text-sm text-slate-100 flex items-center gap-1.5">
+          <i data-lucide="tags" class="w-4 h-4 text-indigo-400"></i> タグ一覧と編集
+        </h3>
+        <button id="btn-close-tag-modal" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+        <p class="text-[11px] text-slate-400">登録されているすべてのタグの一覧です。タグ名の変更や削除ができます。</p>
+        <div id="tag-manage-list" class="space-y-2"></div>
+      </div>
+      <div class="px-4 py-2.5 border-t border-slate-800 flex justify-end bg-slate-900/50">
+        <button id="btn-close-tag-modal-bottom" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Item Modal -->
+  <div id="item-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div class="px-4 py-3 border-b border-slate-800 flex justify-between items-center">
+        <h3 id="modal-title" class="font-bold text-sm text-slate-100">新規データ追加</h3>
+        <button id="btn-close-modal" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <form id="item-form" class="p-4 space-y-3">
+        <input type="hidden" id="item-id">
+        
+        <div>
+          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">データ種別</label>
+          <select id="item-type" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+            <option value="compact">キー / パスワード / 短文</option>
+            <option value="code">長文コード / ファイル</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">タグ (カンマ区切り、または既存から選択)</label>
+          <input type="text" id="item-tags" required placeholder="例: vercel, secret, api" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          <!-- 既存タグのサジェストチップ -->
+          <div id="existing-tags-suggestions" class="flex flex-wrap gap-1 mt-1.5"></div>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">内容</label>
+          <textarea id="item-content" required rows="4" placeholder="値やコードを貼り付け" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">備考欄</label>
+          <textarea id="item-memo" rows="2" placeholder="詳細情報や用途などを記入" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <button type="button" id="btn-cancel-modal" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition">キャンセル</button>
+          <button type="submit" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+      getAuth, 
+      signInWithEmailAndPassword, 
+      createUserWithEmailAndPassword, 
+      signInWithPopup,
+      GoogleAuthProvider,
+      signOut, 
+      onAuthStateChanged 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { 
+      getFirestore, 
+      collection, 
+      addDoc, 
+      updateDoc, 
+      deleteDoc, 
+      doc, 
+      query, 
+      where, 
+      onSnapshot, 
+      serverTimestamp 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAoNZm6KwPQuWbC0W65sOh4soLMx1UoUrQ",
+      authDomain: "g-account-6f48b.firebaseapp.com",
+      projectId: "g-account-6f48b",
+      storageBucket: "g-account-6f48b.firebasestorage.app",
+      messagingSenderId: "719634797870",
+      appId: "1:719634797870:web:5e6c3affbed118aa8d16bf",
+      measurementId: "G-0WB2ZMX6K1"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const googleProvider = new GoogleAuthProvider();
+
+    let currentUser = null;
+    let items = [];
+    let currentTab = 'compact';
+    let searchQuery = '';
+    let selectedTags = new Set(); // 複数選択タグ用
+    let activeDetailItem = null;
+    let isMasked = true; // キー等の目隠し状態
+
+    // DOM
+    const loading = document.getElementById('loading');
+    const authContainer = document.getElementById('auth-container');
+    const appContainer = document.getElementById('app-container');
+    const authForm = document.getElementById('auth-form');
+    const authEmail = document.getElementById('auth-email');
+    const authPassword = document.getElementById('auth-password');
+    const authError = document.getElementById('auth-error');
+    const userNameText = document.getElementById('user-name-text');
+    const btnLogout = document.getElementById('btn-logout');
+    const btnGoogleLogin = document.getElementById('btn-google-login');
+
+    const tabCompact = document.getElementById('tab-compact');
+    const tabCode = document.getElementById('tab-code');
+    const sectionCompact = document.getElementById('section-compact');
+    const sectionCode = document.getElementById('section-code');
+    const compactList = document.getElementById('compact-list');
+    const codeList = document.getElementById('code-list');
+    const searchInput = document.getElementById('search-input');
+    const tagFiltersList = document.getElementById('tag-filters-list');
+
+    const itemModal = document.getElementById('item-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const itemForm = document.getElementById('item-form');
+    const itemIdInput = document.getElementById('item-id');
+    const itemTypeInput = document.getElementById('item-type');
+    const itemTagsInput = document.getElementById('item-tags');
+    const itemContentInput = document.getElementById('item-content');
+    const itemMemoInput = document.getElementById('item-memo');
+    const existingTagsSuggestions = document.getElementById('existing-tags-suggestions');
+
+    const detailModal = document.getElementById('detail-modal');
+    const detailTagsHeader = document.getElementById('detail-tags-header');
+    const detailMemoContainer = document.getElementById('detail-memo-container');
+    const detailMemo = document.getElementById('detail-memo');
+    const detailContentPre = document.getElementById('detail-content-pre').querySelector('code');
+    const detailBtnCopy = document.getElementById('detail-btn-copy');
+    const detailBtnToggleMask = document.getElementById('detail-btn-toggle-mask');
+    const detailBtnEdit = document.getElementById('detail-btn-edit');
+    const detailBtnDelete = document.getElementById('detail-btn-delete');
+
+    const tagManageModal = document.getElementById('tag-manage-modal');
+    const tagManageList = document.getElementById('tag-manage-list');
+
+    function formatAuthInput(val) {
+      if (!val.includes('@')) {
+        return `${val.trim()}@devvault.local`;
+      }
+      return val.trim();
+    }
+
+    // 認証監視
+    onAuthStateChanged(auth, (user) => {
+      loading.classList.add('hidden');
+      if (user) {
+        currentUser = user;
+        if (user.displayName) {
+          userNameText.textContent = user.displayName;
+        } else {
+          userNameText.textContent = user.email.replace('@devvault.local', '');
+        }
+        authContainer.classList.add('hidden');
+        appContainer.classList.remove('hidden');
+        subscribeItems();
+      } else {
+        currentUser = null;
+        authContainer.classList.remove('hidden');
+        appContainer.classList.add('hidden');
+      }
+      lucide.createIcons();
+    });
+
+    btnGoogleLogin.addEventListener('click', async () => {
+      authError.classList.add('hidden');
+      try {
+        await signInWithPopup(auth, googleProvider);
+      } catch (err) {
+        authError.textContent = "Googleログインエラー: " + err.message;
+        authError.classList.remove('hidden');
+      }
+    });
+
+    authForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      authError.classList.add('hidden');
+      const email = formatAuthInput(authEmail.value);
+      try {
+        await signInWithEmailAndPassword(auth, email, authPassword.value);
+      } catch (err) {
+        authError.textContent = "ログインエラー: IDまたはパスワードが正しくありません";
+        authError.classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('btn-signup').addEventListener('click', async () => {
+      authError.classList.add('hidden');
+      if(!authEmail.value || !authPassword.value) {
+        authError.textContent = "IDとパスワードを入力してください";
+        authError.classList.remove('hidden');
+        return;
+      }
+      const email = formatAuthInput(authEmail.value);
+      try {
+        await createUserWithEmailAndPassword(auth, email, authPassword.value);
+      } catch (err) {
+        authError.textContent = "登録エラー: " + err.message;
+        authError.classList.remove('hidden');
+      }
+    });
+
+    btnLogout.addEventListener('click', () => signOut(auth));
+
+    // Firestore 購読
+    function subscribeItems() {
+      if (!currentUser) return;
+      const q = query(collection(db, "items"), where("userId", "==", currentUser.uid));
+      onSnapshot(q, (snapshot) => {
+        items = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          let tags = [];
+          if (Array.isArray(data.tags)) {
+            tags = data.tags;
+          } else if (typeof data.tags === 'string' && data.tags.trim() !== '') {
+            tags = data.tags.split(',').map(t => t.trim()).filter(Boolean);
+          }
+          items.push({ id: doc.id, ...data, tags });
+        });
+        renderTagFilters();
+        renderItems();
+      });
+    }
+
+    // タブ切替
+    tabCompact.addEventListener('click', () => {
+      currentTab = 'compact';
+      tabCompact.className = "flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-indigo-600 text-white transition";
+      tabCode.className = "flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md text-slate-400 hover:text-white transition";
+      sectionCompact.classList.remove('hidden');
+      sectionCode.classList.add('hidden');
+    });
+
+    tabCode.addEventListener('click', () => {
+      currentTab = 'code';
+      tabCode.className = "flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-indigo-600 text-white transition";
+      tabCompact.className = "flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md text-slate-400 hover:text-white transition";
+      sectionCode.classList.remove('hidden');
+      sectionCompact.classList.add('hidden');
+    });
+
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value.toLowerCase();
+      renderItems();
+    });
+
+    // 全タグ一覧の取得
+    function getAllTags() {
+      const allTags = new Set();
+      items.forEach(item => {
+        if (item.tags && Array.isArray(item.tags)) {
+          item.tags.forEach(t => allTags.add(t));
+        }
+      });
+      return Array.from(allTags);
+    }
+
+    // タグフィルター一覧の描画（複数選択対応）
+    function renderTagFilters() {
+      const tags = getAllTags();
+      const allSelected = selectedTags.size === 0;
+
+      let html = `<button onclick="toggleTagFilter('ALL')" class="px-2 py-1 rounded text-[11px] font-medium transition ${allSelected ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'}">すべて</button>`;
+      
+      tags.forEach(tag => {
+        const isSelected = selectedTags.has(tag);
+        html += `<button onclick="toggleTagFilter('${escapeJs(tag)}')" class="px-2 py-1 rounded text-[11px] font-medium transition ${isSelected ? 'bg-indigo-600 text-white shadow' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'}">#${escapeHtml(tag)}</button>`;
+      });
+
+      tagFiltersList.innerHTML = html;
+    }
+
+    window.toggleTagFilter = (tag) => {
+      if (tag === 'ALL') {
+        selectedTags.clear();
+      } else {
+        if (selectedTags.has(tag)) {
+          selectedTags.delete(tag);
+        } else {
+          selectedTags.add(tag);
+        }
+      }
+      renderTagFilters();
+      renderItems();
+    };
+
+    function renderItems() {
+      const filtered = items.filter(item => {
+        const matchesSearch = item.content.toLowerCase().includes(searchQuery) || 
+                              (item.memo && item.memo.toLowerCase().includes(searchQuery)) ||
+                              (item.tags && item.tags.some(t => t.toLowerCase().includes(searchQuery)));
+        
+        // 複数選択されたタグのすべてを含んでいるか (AND条件)
+        let matchesTags = true;
+        if (selectedTags.size > 0) {
+          matchesTags = Array.from(selectedTags).every(t => item.tags && item.tags.includes(t));
+        }
+
+        return matchesSearch && matchesTags;
+      });
+
+      // Compact Render
+      const compactItems = filtered.filter(i => i.type === 'compact' || !i.type);
+      if(compactItems.length === 0) {
+        compactList.innerHTML = `<div class="py-10 text-center text-slate-600 text-xs">データがありません</div>`;
+      } else {
+        compactList.innerHTML = compactItems.map(item => {
+          const maskedContent = isMasked ? '••••••••••••••••' : item.content;
+          return `
+            <div onclick="openDetail('${item.id}')" class="bg-slate-900 hover:bg-slate-800/80 border border-slate-800 rounded-lg px-3 py-2 flex items-center justify-between cursor-pointer transition group">
+              <div class="flex items-center gap-2.5 min-w-0 flex-1 mr-3">
+                <div class="flex items-center gap-1 shrink-0">
+                  ${(item.tags || []).map(t => `<span class="text-[10px] bg-indigo-950/80 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800/50 font-medium">#${escapeHtml(t)}</span>`).join('')}
+                </div>
+                <span class="text-xs font-mono text-slate-400 truncate ml-1">${escapeHtml(maskedContent)}</span>
+                ${item.memo ? `<span class="text-[11px] text-slate-500 truncate hidden md:inline ml-2">(${escapeHtml(item.memo)})</span>` : ''}
               </div>
-              <div class="detail-row">
-                <span style="color:var(--text-sub); font-size:0.7rem;">PASS</span>
-                <span class="detail-val" id="pass-val-${doc.id}">••••••••</span>
-                <button class="icon-btn" style="padding:0 2px;" title="表示切替" onclick="togglePass('${doc.id}', '${escapeHtml(item.password)}')">
-                  <i class="fa-solid fa-eye" id="pass-icon-${doc.id}"></i>
+              <div class="flex items-center gap-1 shrink-0" onclick="event.stopPropagation()">
+                <button onclick="toggleMaskGlobal(event)" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded transition" title="表示/隠す切替">
+                  <i data-lucide="${isMasked ? 'eye' : 'eye-off'}" class="w-3.5 h-3.5"></i>
                 </button>
-                <button class="copy-btn" onclick="copyText('${escapeHtml(item.password)}')">コピー</button>
+                <button onclick="copyToClipboard('${escapeJs(item.content)}')" class="p-1.5 bg-slate-800 hover:bg-indigo-600/30 text-slate-400 hover:text-indigo-300 rounded transition" title="コピー">
+                  <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="openDetail('${item.id}')" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded transition" title="詳細">
+                  <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                </button>
               </div>
             </div>
           `;
-          listEl.appendChild(card);
-        });
+        }).join('');
+      }
 
-        if (count === 0) {
-          listEl.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:30px; color:var(--text-sub); font-size:0.85rem;">このカテゴリにはサイトがありません 🌿</div>';
-        }
-      });
-  }
+      // Code Items Render
+      const codeItems = filtered.filter(i => i.type === 'code');
+      if(codeItems.length === 0) {
+        codeList.innerHTML = `<div class="py-10 text-center text-slate-600 text-xs">長文コードが登録されていません</div>`;
+      } else {
+        codeList.innerHTML = codeItems.map(item => `
+          <div onclick="openDetail('${item.id}')" class="bg-slate-900 hover:bg-slate-800/80 border border-slate-800 rounded-lg px-3 py-2.5 flex items-center justify-between cursor-pointer transition group">
+            <div class="flex items-center gap-3 min-w-0 flex-1 mr-3">
+              <i data-lucide="file-code" class="w-4 h-4 text-indigo-400 shrink-0"></i>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 mb-0.5">
+                  <div class="flex items-center gap-1">
+                    ${(item.tags || []).map(t => `<span class="text-[10px] bg-indigo-950/80 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800/50 font-medium">#${escapeHtml(t)}</span>`).join('')}
+                  </div>
+                </div>
+                ${item.memo ? `<p class="text-[11px] text-slate-400 truncate">${escapeHtml(item.memo)}</p>` : ''}
+              </div>
+            </div>
+            <div class="flex items-center gap-1 shrink-0" onclick="event.stopPropagation()">
+              <button onclick="copyToClipboard('${escapeJs(item.content)}')" class="p-1.5 bg-slate-800 hover:bg-indigo-600/30 text-slate-400 hover:text-indigo-300 rounded transition" title="コピー">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="openDetail('${item.id}')" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded transition" title="詳細">
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+        `).join('');
+      }
 
-  // パスワード表示/非表示トグル
-  function togglePass(docId, realPassword) {
-    const valEl = document.getElementById(`pass-val-${docId}`);
-    const iconEl = document.getElementById(`pass-icon-${docId}`);
-    
-    if (valEl.innerText === '••••••••') {
-      valEl.innerText = realPassword;
-      iconEl.classList.remove('fa-eye');
-      iconEl.classList.add('fa-eye-slash');
-    } else {
-      valEl.innerText = '••••••••';
-      iconEl.classList.remove('fa-eye-slash');
-      iconEl.classList.add('fa-eye');
+      lucide.createIcons();
     }
-  }
 
-  // 保存（追加/更新）
-  async function saveItem(e) {
-    e.preventDefault();
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const docId = document.getElementById('item-doc-id').value;
-    const title = document.getElementById('item-title').value;
-    const category = document.getElementById('item-category').value;
-    const url = document.getElementById('item-url').value;
-    const username = document.getElementById('item-username').value;
-    const password = document.getElementById('item-password').value;
-
-    const payload = {
-      title, category, url, username, password,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    // 全体のマスク切り替え
+    window.toggleMaskGlobal = (e) => {
+      e.stopPropagation();
+      isMasked = !isMasked;
+      renderItems();
     };
 
-    try {
-      const ref = db.collection('users').doc(user.uid).collection('accounts');
-      if (docId) {
-        await ref.doc(docId).update(payload);
+    // Detail Modal Control
+    window.openDetail = (id) => {
+      const item = items.find(i => i.id === id);
+      if(!item) return;
+      activeDetailItem = item;
+      
+      if(item.tags && item.tags.length > 0) {
+        detailTagsHeader.innerHTML = item.tags.map(t => `<span class="text-[11px] bg-indigo-950 border border-indigo-800/60 text-indigo-300 px-2.5 py-0.5 rounded font-medium">#${escapeHtml(t)}</span>`).join('');
       } else {
-        payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-        await ref.add(payload);
+        detailTagsHeader.innerHTML = '';
       }
-      closeAddModal();
-    } catch (err) {
-      alert('保存エラー: ' + err.message);
-    }
-  }
 
-  // 削除
-  async function deleteItem(docId) {
-    if (!confirm('本当にこのサイト情報を削除しますか？')) return;
-    const user = auth.currentUser;
-    if (user) {
-      await db.collection('users').doc(user.uid).collection('accounts').doc(docId).delete();
-    }
-  }
+      if(item.memo) {
+        detailMemo.textContent = item.memo;
+        detailMemoContainer.classList.remove('hidden');
+      } else {
+        detailMemoContainer.classList.add('hidden');
+      }
 
-  // トースト付きクリップボードコピー
-  function copyText(text) {
-    navigator.clipboard.writeText(text).then(() => {
-      showToast('コピーしました！');
+      detailContentPre.textContent = item.content;
+      hljs.highlightElement(detailContentPre);
+      detailModal.classList.remove('hidden');
+      lucide.createIcons();
+    };
+
+    document.getElementById('btn-close-detail').addEventListener('click', () => detailModal.classList.add('hidden'));
+
+    detailBtnCopy.addEventListener('click', () => {
+      if(activeDetailItem) copyToClipboard(activeDetailItem.content);
     });
-  }
 
-  function showToast(msg) {
-    const toast = document.getElementById('toast');
-    toast.innerText = msg;
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 1800);
-  }
-
-  // モーダル（サイト追加・編集）
-  function openAddModal() {
-    document.getElementById('modal-title').innerText = '新しいサイトを追加';
-    document.getElementById('item-doc-id').value = '';
-    document.getElementById('item-title').value = '';
-    document.getElementById('item-url').value = '';
-    document.getElementById('item-username').value = '';
-    document.getElementById('item-password').value = '';
-    document.getElementById('add-modal').classList.add('active');
-  }
-
-  function editItem(id, title, category, url, username, password) {
-    document.getElementById('modal-title').innerText = 'サイト情報の編集';
-    document.getElementById('item-doc-id').value = id;
-    document.getElementById('item-title').value = title;
-    document.getElementById('item-category').value = category;
-    document.getElementById('item-url').value = url;
-    document.getElementById('item-username').value = username;
-    document.getElementById('item-password').value = password;
-    document.getElementById('add-modal').classList.add('active');
-  }
-
-  function closeAddModal() {
-    document.getElementById('add-modal').classList.remove('active');
-  }
-
-  // カテゴリ管理モーダル
-  function openCatManageModal() {
-    renderCatManageList();
-    document.getElementById('cat-modal').classList.add('active');
-  }
-
-  function closeCatManageModal() {
-    document.getElementById('cat-modal').classList.remove('active');
-  }
-
-  function renderCatManageList() {
-    const container = document.getElementById('cat-list-container');
-    container.innerHTML = '';
-    userCategories.forEach((cat, idx) => {
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid #f0e6e2; font-size:0.85rem;';
-      row.innerHTML = `
-        <span>${escapeHtml(cat)}</span>
-        <button class="icon-btn" style="color:red;" onclick="removeCategory(${idx})"><i class="fa-solid fa-xmark"></i></button>
-      `;
-      container.appendChild(row);
+    detailBtnToggleMask.addEventListener('click', () => {
+      if(detailContentPre.classList.contains('security-masked')) {
+        detailContentPre.classList.remove('security-masked', 'blur-sm', 'select-none');
+        detailBtnToggleMask.innerHTML = `<i data-lucide="eye-off" class="w-3 h-3"></i> 隠す`;
+      } else {
+        detailContentPre.classList.add('security-masked', 'blur-sm', 'select-none');
+        detailBtnToggleMask.innerHTML = `<i data-lucide="eye" class="w-3 h-3"></i> 表示`;
+      }
+      lucide.createIcons();
     });
-  }
 
-  async function addCategory() {
-    const input = document.getElementById('new-cat-input');
-    const val = input.value.trim();
-    if (!val) return;
-    if (userCategories.includes(val)) {
-      alert('同じ名前のタブが既に存在します。');
-      return;
+    detailBtnEdit.addEventListener('click', () => {
+      detailModal.classList.add('hidden');
+      editItem(activeDetailItem.id);
+    });
+
+    detailBtnDelete.addEventListener('click', async () => {
+      if(activeDetailItem && confirm("この項目を削除しますか？")) {
+        await deleteDoc(doc(db, "items", activeDetailItem.id));
+        detailModal.classList.add('hidden');
+      }
+    });
+
+    // Tag Management Modal
+    document.getElementById('btn-manage-tags').addEventListener('click', () => {
+      renderTagManageList();
+      tagManageModal.classList.remove('hidden');
+    });
+
+    document.getElementById('btn-close-tag-modal').addEventListener('click', () => tagManageModal.classList.add('hidden'));
+    document.getElementById('btn-close-tag-modal-bottom').addEventListener('click', () => tagManageModal.classList.add('hidden'));
+
+    function renderTagManageList() {
+      const tags = getAllTags();
+      if(tags.length === 0) {
+        tagManageList.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">登録されているタグはありません</p>`;
+        return;
+      }
+
+      tagManageList.innerHTML = tags.map(tag => `
+        <div class="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-lg p-2.5">
+          <div class="flex items-center gap-2 flex-1 mr-2">
+            <span class="text-xs text-indigo-300 font-medium">#${escapeHtml(tag)}</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button onclick="renameTag('${escapeJs(tag)}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded transition">名称変更</button>
+            <button onclick="deleteTagGlobally('${escapeJs(tag)}')" class="px-2.5 py-1 bg-red-950/40 hover:bg-red-900/50 text-red-400 text-xs rounded transition">削除</button>
+          </div>
+        </div>
+      `).join('');
+      lucide.createIcons();
     }
-    userCategories.push(val);
-    input.value = '';
-    await saveUserCategories();
-    renderCatManageList();
-    renderCategoryTabs();
-  }
 
-  async function removeCategory(idx) {
-    if (userCategories.length <= 1) {
-      alert('カテゴリは最低1つ必要です。');
-      return;
+    window.renameTag = async (oldTag) => {
+      const newTag = prompt(`「${oldTag}」の新しいタグ名を入力してください:`, oldTag);
+      if(!newTag || newTag.trim() === '' || newTag === oldTag) return;
+      const cleanNewTag = newTag.trim();
+
+      const batchPromises = items.filter(item => item.tags && item.tags.includes(oldTag)).map(async (item) => {
+        const updatedTags = item.tags.map(t => t === oldTag ? cleanNewTag : t);
+        await updateDoc(doc(db, "items", item.id), { tags: updatedTags });
+      });
+
+      await Promise.all(batchPromises);
+      if(selectedTags.has(oldTag)) {
+        selectedTags.delete(oldTag);
+        selectedTags.add(cleanNewTag);
+      }
+      renderTagManageList();
+      alert("タグ名を変更しました");
+    };
+
+    window.deleteTagGlobally = async (targetTag) => {
+      if(!confirm(`タグ「#${targetTag}」をすべてのデータから削除しますか？`)) return;
+
+      const batchPromises = items.filter(item => item.tags && item.tags.includes(targetTag)).map(async (item) => {
+        const updatedTags = item.tags.filter(t => t !== targetTag);
+        await updateDoc(doc(db, "items", item.id), { tags: updatedTags });
+      });
+
+      await Promise.all(batchPromises);
+      selectedTags.delete(targetTag);
+      renderTagManageList();
+      alert("タグを削除しました");
+    };
+
+    // Add/Edit Item Modal
+    document.getElementById('btn-add-item').addEventListener('click', () => {
+      itemIdInput.value = '';
+      itemForm.reset();
+      itemTypeInput.value = currentTab;
+      modalTitle.textContent = "新規データ追加";
+      renderExistingTagSuggestions();
+      itemModal.classList.remove('hidden');
+    });
+
+    const closeItemModal = () => itemModal.classList.add('hidden');
+    document.getElementById('btn-close-modal').addEventListener('click', closeItemModal);
+    document.getElementById('btn-cancel-modal').addEventListener('click', closeItemModal);
+
+    function renderExistingTagSuggestions() {
+      const tags = getAllTags();
+      if(tags.length === 0) {
+        existingTagsSuggestions.innerHTML = '';
+        return;
+      }
+      existingTagsSuggestions.innerHTML = `<span class="text-[10px] text-slate-500 w-full block mb-0.5">クリックしてタグを追加:</span>` + 
+        tags.map(t => `<button type="button" onclick="appendTagToInput('${escapeJs(t)}')" class="text-[10px] bg-slate-950 hover:bg-slate-800 text-indigo-300 border border-slate-800 px-2 py-0.5 rounded transition">#${escapeHtml(t)}</button>`).join('');
     }
-    userCategories.splice(idx, 1);
-    await saveUserCategories();
-    renderCatManageList();
-    renderCategoryTabs();
-  }
 
-  async function saveUserCategories() {
-    const user = auth.currentUser;
-    if (user) {
-      await db.collection('users').doc(user.uid).collection('settings').doc('categories').set({
-        list: userCategories
+    window.appendTagToInput = (tag) => {
+      const currentVal = itemTagsInput.value.trim();
+      const tagsArr = currentVal ? currentVal.split(',').map(s => s.trim()).filter(Boolean) : [];
+      if(!tagsArr.includes(tag)) {
+        tagsArr.push(tag);
+        itemTagsInput.value = tagsArr.join(', ');
+      }
+    };
+
+    itemForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = itemIdInput.value;
+      const rawTags = itemTagsInput.value;
+      const tagsArray = rawTags.split(',').map(t => t.trim()).filter(Boolean);
+
+      const data = {
+        userId: currentUser.uid,
+        type: itemTypeInput.value,
+        tags: tagsArray,
+        content: itemContentInput.value,
+        memo: itemMemoInput.value,
+        updatedAt: serverTimestamp()
+      };
+
+      try {
+        if(id) {
+          await updateDoc(doc(db, "items", id), data);
+        } else {
+          await addDoc(collection(db, "items"), data);
+        }
+        closeItemModal();
+      } catch (err) {
+        alert("保存失敗: " + err.message);
+      }
+    });
+
+    window.editItem = (id) => {
+      const item = items.find(i => i.id === id);
+      if(!item) return;
+      itemIdInput.value = item.id;
+      itemTypeInput.value = item.type || 'compact';
+      itemTagsInput.value = Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || '');
+      itemContentInput.value = item.content;
+      itemMemoInput.value = item.memo || '';
+      modalTitle.textContent = "データを編集";
+      renderExistingTagSuggestions();
+      itemModal.classList.remove('hidden');
+    };
+
+    window.copyToClipboard = (text) => {
+      navigator.clipboard.writeText(text).then(() => {
+        const toast = document.getElementById('toast');
+        toast.classList.remove('opacity-0', 'pointer-events-none');
+        setTimeout(() => toast.classList.add('opacity-0', 'pointer-events-none'), 1800);
+      });
+    };
+
+    function escapeHtml(str) {
+      if(!str) return '';
+      return str.replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
       });
     }
-  }
-
-  // ジャンプ先・ランチャーモーダル
-  function openLauncherModal(url, title, username, password) {
-    currentLaunchingData = { url, title, username, password, showPass: false };
-    document.getElementById('launcher-modal-title').innerText = title;
-    document.getElementById('launch-id-val').innerText = username;
-    document.getElementById('launch-pass-val').innerText = '••••••••';
-    document.getElementById('launch-pass-icon').className = 'fa-solid fa-eye';
-    document.getElementById('launch-direct-link').href = url;
-
-    // QRコード生成
-    const qrContainer = document.getElementById('qrcode');
-    qrContainer.innerHTML = '';
-    qrcodeObj = new QRCode(qrContainer, {
-      text: url,
-      width: 130,
-      height: 130,
-      colorDark : "#5f5755",
-      colorLight : "#ffffff",
-      correctLevel : QRCode.CorrectLevel.H
-    });
-
-    document.getElementById('launcher-modal').classList.add('active');
-  }
-
-  function toggleLauncherPass() {
-    if (!currentLaunchingData) return;
-    currentLaunchingData.showPass = !currentLaunchingData.showPass;
-    const valEl = document.getElementById('launch-pass-val');
-    const iconEl = document.getElementById('launch-pass-icon');
-
-    if (currentLaunchingData.showPass) {
-      valEl.innerText = currentLaunchingData.password;
-      iconEl.className = 'fa-solid fa-eye-slash';
-    } else {
-      valEl.innerText = '••••••••';
-      iconEl.className = 'fa-solid fa-eye';
+    function escapeJs(str) {
+      if(!str) return '';
+      return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
     }
-  }
-
-  function copyLauncherText(type) {
-    if (!currentLaunchingData) return;
-    const text = type === 'id' ? currentLaunchingData.username : currentLaunchingData.password;
-    copyText(text);
-  }
-
-  function closeLauncherModal() {
-    document.getElementById('launcher-modal').classList.remove('active');
-  }
-
-  // HTMLエスケープ（XSS防止）
-  function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/[&<>"']/g, function(m) {
-      return {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-      }[m];
-    });
-  }
-</script>
+  </script>
 </body>
 </html>
