@@ -3,222 +3,272 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Item DB - 商品＆価格管理データベース</title>
-
-  <!-- Tailwind CSS CDN -->
+  <title>DevVault - Keys & Secrets Manager</title>
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Google Fonts & FontAwesome -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <!-- Leaflet CSS & JS (店舗マップ用) -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- JAN Master Proと同系統のQuagga2スキャナ -->
-  <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
-
-  <!-- Firebase v10 Compat -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
   <style>
-    body { font-family: 'Inter', sans-serif; }
-    .nav-active { color: #2563eb; border-bottom: 2px solid #2563eb; }
-    #reader { position: relative; width: 100%; height: 300px; background: #0f172a; overflow: hidden; border-radius: .75rem; }
-    #reader video { display:block; width:100% !important; height:100% !important; object-fit:cover; }
-    #reader canvas.drawingBuffer { position:absolute; inset:0; width:100% !important; height:100% !important; }
-    #reader::after { content:''; position:absolute; left:8%; right:8%; top:34%; height:32%; border:2px solid rgba(52,211,153,.95); border-radius:8px; box-shadow:0 0 0 999px rgba(15,23,42,.22); pointer-events:none; z-index:4; }
-    #reader::before { content:'JANバーコードを緑の枠に合わせる'; position:absolute; z-index:5; left:0; right:0; top:calc(34% - 26px); color:white; text-align:center; font-size:11px; text-shadow:0 1px 3px #000; pointer-events:none; }
-    input, textarea, button { -webkit-tap-highlight-color: transparent; }
-    .compact-panel { padding: .75rem !important; border-radius: .8rem !important; }
-    @media (max-width: 640px) { #reader { height: 260px; } }
+    @media (max-width: 640px) {
+      input, select, textarea {
+        font-size: 16px !important;
+      }
+    }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
 
-  <!-- ヘッダー -->
-  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
-    <div class="max-w-6xl mx-auto px-3 py-2.5 flex justify-between items-center">
-      <div class="flex items-center space-x-2.5">
-        <div class="bg-blue-600 text-white p-2 rounded-xl text-lg font-bold shadow-sm">
-          <i class="fa-solid fa-barcode"></i>
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50 flex items-center gap-2 text-xs">
+    <i data-lucide="check-circle" class="w-4 h-4"></i>
+    <span id="toast-message">クリップボードにコピーしました</span>
+  </div>
+
+  <!-- Loading Screen -->
+  <div id="loading" class="fixed inset-0 bg-slate-950 z-50 flex flex-col items-center justify-center gap-3">
+    <div class="animate-spin rounded-full h-10 w-10 border-2 border-indigo-500 border-t-transparent"></div>
+    <span class="text-xs text-slate-400">読み込み中...</span>
+  </div>
+
+  <!-- Auth View -->
+  <div id="auth-container" class="hidden flex-1 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-sm">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="p-2.5 bg-indigo-600/20 text-indigo-400 rounded-lg">
+          <i data-lucide="shield-check" class="w-6 h-6"></i>
         </div>
         <div>
-          <h1 class="text-base font-bold leading-tight text-slate-900">Smart Item DB</h1>
-          <p class="text-[11px] text-slate-500">店舗＆EC価格管理 <span id="storageStatus" class="text-emerald-600">· アカウント保存</span></p>
+          <h1 class="text-xl font-bold">DevVault</h1>
+          <p class="text-xs text-slate-400">キー・パスワード管理</p>
         </div>
       </div>
 
-      <!-- ログイン状況・ユーザーエリア -->
-      <div id="userInfoArea" class="flex items-center space-x-3">
-        <!-- JS動的描画 -->
-      </div>
-    </div>
-
-    <!-- ナビゲーションタブ -->
-    <nav class="max-w-6xl mx-auto px-4 flex space-x-6 text-sm font-medium border-t border-slate-100 overflow-x-auto">
-      <button onclick="switchTab('items')" id="tab-items" class="py-2.5 nav-active whitespace-nowrap">
-        <i class="fa-solid fa-boxes-stacked mr-1.5"></i>商品・価格一覧
-      </button>
-      <button onclick="switchTab('map')" id="tab-map" class="py-2.5 text-slate-600 hover:text-blue-600 whitespace-nowrap">
-        <i class="fa-solid fa-map-location-dot mr-1.5"></i>店舗マップ
-      </button>
-    </nav>
-  </header>
-
-  <!-- メインコンテンツ -->
-  <main class="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-4 space-y-3">
-
-    <!-- TAB 1: 商品一覧＆データベース -->
-    <section id="view-items" class="space-y-4">
-      
-      <!-- DB切り替え & アクションバー -->
-      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-        <!-- 個人 / オープン DB切り替え -->
-        <div class="flex bg-slate-100 p-1 rounded-lg self-start">
-          <button id="dbTypePersonal" onclick="setDbType('personal')" class="px-4 py-1.5 text-xs font-semibold rounded-md bg-white text-blue-600 shadow-sm transition">
-            <i class="fa-solid fa-user mr-1"></i>個人 DB
-          </button>
-          <button id="dbTypeOpen" onclick="setDbType('open')" class="px-4 py-1.5 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900 transition">
-            <i class="fa-solid fa-earth-americas mr-1"></i>オープン DB (公開)
-          </button>
-        </div>
-
-        <!-- 各種アクションボタン -->
-        <div class="flex flex-wrap gap-2">
-          <button onclick="openScanModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg text-xs font-medium flex items-center shadow-sm transition">
-            <i class="fa-solid fa-camera mr-1.5"></i>JANスキャン
-          </button>
-          <button onclick="openItemModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg text-xs font-medium flex items-center shadow-sm transition">
-            <i class="fa-solid fa-plus mr-1.5"></i>商品登録
-          </button>
-          <button onclick="triggerMerge()" class="bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 rounded-lg text-xs font-medium flex items-center shadow-sm transition" title="オープンDBと個人DBをマージします">
-            <i class="fa-solid fa-code-merge mr-1.5"></i>DBマージ
-          </button>
-        </div>
-      </div>
-
-      <!-- 検索・フィルターバー -->
-      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-3">
-        <div class="relative">
-          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-sm"></i>
-          <input type="text" id="searchInput" oninput="filterItems()" placeholder="商品名、JANコード、店舗名で検索..." class="w-full pl-10 pr-12 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <button type="button" onclick="openSearchScanModal()" title="カメラでJAN検索" aria-label="カメラでJAN検索" class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-blue-600 hover:bg-blue-50"><i class="fa-solid fa-camera"></i></button>
-        </div>
-        <!-- タグは一覧に並べず、登録時の入力候補としてのみ表示 -->
-        <div id="tagContainer" class="hidden"></div>
-      </div>
-
-      <!-- 商品グリッドカード -->
-      <div id="itemList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <!-- JS動的描画 -->
-      </div>
-    </section>
-
-    <!-- TAB 2: 店舗マップ -->
-    <section id="view-map" class="hidden space-y-4">
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
-        <div>
-          <h2 class="font-bold text-slate-800 text-sm">周辺の取扱店舗マップ</h2>
-          <p class="text-xs text-slate-500">GPS・地図から購入店舗の位置を確認</p>
-        </div>
-        <button onclick="locateUser()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-1.5 rounded-lg border border-slate-300">
-          <i class="fa-solid fa-location-crosshairs mr-1"></i>現在地を取得
+      <div class="space-y-4">
+        <!-- Google Login Button -->
+        <button id="btn-google-login" class="w-full bg-white hover:bg-slate-100 text-slate-800 font-medium py-2.5 px-4 rounded-lg transition text-xs flex items-center justify-center gap-2 shadow">
+          <svg class="w-4 h-4" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+          Googleでログイン
         </button>
+
+        <div class="relative flex py-2 items-center">
+          <div class="flex-grow border-t border-slate-800"></div>
+          <span class="flex-shrink mx-4 text-slate-500 text-[10px] uppercase">またはID / メール</span>
+          <div class="flex-grow border-t border-slate-800"></div>
+        </div>
+
+        <form id="auth-form" class="space-y-3">
+          <div>
+            <input type="text" id="auth-email" placeholder="ID または メールアドレス"
+              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <input type="password" id="auth-password" placeholder="パスワード"
+              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          </div>
+
+          <div id="auth-error" class="text-red-400 text-[11px] hidden"></div>
+
+          <div class="pt-1 flex gap-2">
+            <button type="submit" id="btn-login" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-lg transition text-xs">
+              ログイン
+            </button>
+            <button type="button" id="btn-signup" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2 rounded-lg transition text-xs">
+              新規登録
+            </button>
+          </div>
+        </form>
       </div>
-      <div id="map" class="w-full h-[500px] rounded-xl border border-slate-200 shadow-inner"></div>
-    </section>
-
-
-  </main>
-
-  <!-- Modal: JANコードスキャナー -->
-  <div id="scanModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl">
-      <div class="flex justify-between items-center border-b pb-2">
-        <h3 class="font-bold text-slate-800 text-sm"><i class="fa-solid fa-camera mr-2 text-blue-600"></i>JANバーコードスキャン</h3>
-        <button onclick="closeScanModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-      </div>
-      <div id="reader"></div>
-      <div id="scanStatus" class="text-center text-[11px] text-slate-500">カメラ起動準備中…</div>
-      <div class="flex gap-2"><button type="button" onclick="restartScanCamera()" class="flex-1 rounded-lg bg-blue-600 text-white py-2 text-xs font-semibold"><i class="fa-solid fa-camera-rotate mr-1"></i>再読み込み</button><button type="button" onclick="closeScanModal()" class="rounded-lg border border-slate-300 px-4 py-2 text-xs">閉じる</button></div>
     </div>
   </div>
 
-  <!-- Modal: 商品登録 / 編集 -->
-  <div id="itemModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-5 space-y-3 shadow-xl my-6 text-xs md:text-sm">
-      <div class="flex justify-between items-center border-b pb-3">
-        <h3 id="modalTitle" class="font-bold text-slate-900 text-base">商品を新規登録</h3>
-        <button onclick="closeItemModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+  <!-- Main App View -->
+  <div id="app-container" class="hidden flex-1 flex flex-col">
+    <!-- Header (スッキリしたデザイン) -->
+    <header class="bg-slate-900/80 backdrop-blur border-b border-slate-800 sticky top-0 z-40 px-4 sm:px-6 py-2.5 flex justify-between items-center">
+      <div class="flex items-center gap-2.5">
+        <div class="p-1.5 bg-indigo-600/20 text-indigo-400 rounded-lg">
+          <i data-lucide="key-round" class="w-4 h-4"></i>
+        </div>
+        <span class="font-bold text-sm tracking-wide">DevVault</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="user-display" class="text-[11px] text-slate-300 font-medium bg-slate-950 px-3 py-1 rounded-md border border-slate-800 flex items-center gap-1.5">
+          <i data-lucide="user" class="w-3 h-3 text-indigo-400"></i>
+          <span id="user-name-text"></span>
+        </span>
+        <button id="btn-logout" class="text-xs text-slate-400 hover:text-white flex items-center gap-1 bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-md transition">
+          <i data-lucide="log-out" class="w-3 h-3"></i>
+          ログアウト
+        </button>
+      </div>
+    </header>
+
+    <!-- Content Area -->
+    <main class="flex-1 max-w-5xl w-full mx-auto p-3 sm:p-6 space-y-4">
+      
+      <!-- Action Bar -->
+      <div class="flex flex-col sm:flex-row justify-between gap-3 items-center">
+        <div class="flex items-center gap-1.5 text-xs text-slate-400">
+          <i data-lucide="shield" class="w-4 h-4 text-indigo-400"></i>
+          <span>APIキー・パスワード・接続文字列管理</span>
+        </div>
+
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <div class="relative flex-1 sm:w-48">
+            <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500"></i>
+            <input type="text" id="search-input" placeholder="検索..." class="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          </div>
+          <button id="btn-manage-tags" class="bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0 border border-slate-700" title="タグ管理">
+            <i data-lucide="tags" class="w-3.5 h-3.5 text-indigo-400"></i>
+            タグ管理
+          </button>
+          <button id="btn-add-item" class="bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            追加
+          </button>
+        </div>
       </div>
 
-      <form id="itemForm" onsubmit="handleSaveItem(event)" class="space-y-3">
-        <input type="hidden" id="editItemId">
+      <!-- Tag Filter Bar -->
+      <div id="tag-filter-container" class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+        <span class="text-[10px] text-slate-500 uppercase font-semibold shrink-0 mr-1">タグ絞り込み:</span>
+        <div id="tag-filters-list" class="flex items-center gap-1.5"></div>
+      </div>
 
-        <div class="grid grid-cols-2 gap-2">
-          <div><label class="block font-medium text-slate-700 mb-1">メーカー名</label><input type="text" id="formMaker" class="w-full p-2 border border-slate-300 rounded-lg" placeholder="例：サントリー"></div>
-          <div><label class="block font-medium text-slate-700 mb-1">商品名 <span class="text-red-500">*</span></label><input type="text" id="formName" required class="w-full p-2 border border-slate-300 rounded-lg" placeholder="例：天然水"></div>
-          <div><label class="block font-medium text-slate-700 mb-1">フレーバー・種類など</label><input type="text" id="formFlavor" class="w-full p-2 border border-slate-300 rounded-lg" placeholder="例：レモン、無糖"></div>
-          <div><label class="block font-medium text-slate-700 mb-1">内容量</label><input type="text" id="formContent" class="w-full p-2 border border-slate-300 rounded-lg" placeholder="例：500ml、6本"></div>
+      <!-- Item List Section -->
+      <section class="space-y-1.5">
+        <div id="items-list" class="space-y-1.5"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Detail Modal -->
+  <div id="detail-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+      <div class="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+        <div id="detail-tags-header" class="flex flex-wrap gap-1 min-w-0"></div>
+        <button id="btn-close-detail" class="text-slate-400 hover:text-white p-1 shrink-0">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="p-4 space-y-3 overflow-y-auto flex-1">
+        <div id="detail-memo-container" class="hidden">
+          <span class="text-[10px] text-slate-500 uppercase font-semibold">備考欄</span>
+          <p id="detail-memo" class="text-xs text-slate-300 mt-0.5 whitespace-pre-wrap"></p>
         </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block font-medium text-slate-700 mb-1">JANコード</label>
-            <div class="flex gap-1"><input type="text" id="formJan" class="min-w-0 flex-1 p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="4900000000000"><button type="button" onclick="openJanFieldScanModal()" title="カメラでJANを読み取る" aria-label="カメラでJANを読み取る" class="shrink-0 px-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-700"><i class="fa-solid fa-camera"></i></button></div>
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-[10px] text-slate-500 uppercase font-semibold">値 / キー</span>
+            <div class="flex items-center gap-2">
+              <button id="detail-btn-toggle-mask" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded flex items-center gap-1 transition">
+                <i data-lucide="eye" class="w-3 h-3"></i> 表示/隠す
+              </button>
+              <button id="detail-btn-copy" class="text-[11px] bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 px-2 py-1 rounded flex items-center gap-1 transition">
+                <i data-lucide="copy" class="w-3 h-3"></i> コピー
+              </button>
+            </div>
           </div>
-          <div>
-            <label class="block font-medium text-slate-700 mb-1">タグ（「,」または「、」で区切り）</label>
-            <input type="text" id="formTags" autocomplete="off" oninput="renderTagSuggestions()" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="飲料、特売">
-            <div id="tagSuggestions" class="flex flex-wrap gap-1 mt-1"></div>
-          </div>
+          <pre id="detail-content-pre" class="bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono overflow-x-auto text-slate-200 whitespace-pre-wrap select-none blur-sm transition-all duration-200"><code><span id="detail-code-block"></span></code></pre>
         </div>
+      </div>
+      <div class="px-4 py-2.5 border-t border-slate-800 flex justify-end gap-2 bg-slate-900/50">
+        <button id="detail-btn-edit" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium transition flex items-center gap-1">
+          <i data-lucide="pencil" class="w-3 h-3"></i> 編集
+        </button>
+        <button id="detail-btn-delete" class="px-3 py-1.5 bg-red-950/40 hover:bg-red-900/50 text-red-400 rounded-lg text-xs font-medium transition flex items-center gap-1">
+          <i data-lucide="trash-2" class="w-3 h-3"></i> 削除
+        </button>
+      </div>
+    </div>
+  </div>
 
-        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
-          <p class="font-bold text-xs text-slate-700"><i class="fa-solid fa-store mr-1 text-blue-600"></i>店舗・日付・価格の記録</p>
-          <div class="grid grid-cols-2 gap-2">
-            <div><label class="block text-[10px] text-slate-500 mb-1">店舗名</label><input type="text" id="formStore" placeholder="例：イオン" class="w-full p-2 border border-slate-300 rounded-lg bg-white text-xs"></div>
-            <div><label class="block text-[10px] text-slate-500 mb-1">支店・店舗名</label><input type="text" id="formBranch" placeholder="例：名古屋駅前店" class="w-full p-2 border border-slate-300 rounded-lg bg-white text-xs"></div>
-            <div><label class="block text-[10px] text-slate-500 mb-1">価格（税抜・円）</label><input type="number" id="formPrice" min="0" step="1" placeholder="税抜価格" class="w-full p-2 border border-slate-300 rounded-lg bg-white text-xs"></div>
-            <div><label class="block text-[10px] text-slate-500 mb-1">商品区分（消費税）</label><select id="formTaxType" class="w-full p-2 border border-slate-300 rounded-lg bg-white text-xs"><option value="food">食品（8%）</option><option value="other">食品以外（10%）</option></select></div>
-            <div class="col-span-2"><label class="block text-[10px] text-slate-500 mb-1">記録日</label><input type="date" id="formDate" class="w-full p-2 border border-slate-300 rounded-lg bg-white text-xs"></div>
-          </div>
+  <!-- Tag Management Modal -->
+  <div id="tag-manage-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div class="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+        <h3 class="font-bold text-sm text-slate-100 flex items-center gap-1.5">
+          <i data-lucide="tags" class="w-4 h-4 text-indigo-400"></i> タグ一覧と編集
+        </h3>
+        <button id="btn-close-tag-modal" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+        <div id="tag-manage-list" class="space-y-2"></div>
+      </div>
+      <div class="px-4 py-2.5 border-t border-slate-800 flex justify-end bg-slate-900/50">
+        <button id="btn-close-tag-modal-bottom" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Item Modal -->
+  <div id="item-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div class="px-4 py-3 border-b border-slate-800 flex justify-between items-center">
+        <h3 id="modal-title" class="font-bold text-sm text-slate-100">新規キー追加</h3>
+        <button id="btn-close-modal" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <form id="item-form" class="p-4 space-y-3">
+        <input type="hidden" id="item-id">
+        
+        <div>
+          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">タグ (カンマ区切り)</label>
+          <input type="text" id="item-tags" required placeholder="例: vercel, secret, api" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          <div id="existing-tags-suggestions" class="flex flex-wrap gap-1 mt-1.5"></div>
         </div>
 
         <div>
-          <label class="block font-medium text-slate-700 mb-1">備考欄</label>
-          <textarea id="formMemo" rows="2" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="特売情報やメモなど"></textarea>
+          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">キー / パスワード / 値</label>
+          <textarea id="item-content" required rows="3" placeholder="APIキーや秘密の文字列を貼り付け" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500"></textarea>
         </div>
 
-        <!-- 登録・編集ボタン / 削除ボタン -->
-        <div class="pt-2 flex justify-between items-center">
-          <div>
-            <button type="button" id="deleteBtn" onclick="handleDeleteItem()" class="hidden px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-medium transition">削除する</button>
-          </div>
-          <div class="flex space-x-2">
-            <button type="button" onclick="closeItemModal()" class="px-4 py-2 border rounded-lg text-slate-600 hover:bg-slate-100">キャンセル</button>
-            <button type="submit" class="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-sm">保存する</button>
-          </div>
+        <div>
+          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">備考欄 (任意)</label>
+          <input type="text" id="item-memo" placeholder="用途など（例: 本番用Vercelトークン）" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <button type="button" id="btn-cancel-modal" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition">キャンセル</button>
+          <button type="submit" id="btn-submit-item" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition">保存</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Modal: 商品詳細（閲覧専用） -->
-  <div id="detailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-5 space-y-4 shadow-xl my-6">
-      <div class="flex justify-between items-center border-b pb-3"><h3 class="font-bold text-slate-900 text-base">商品詳細</h3><button type="button" onclick="closeDetailModal()" class="text-slate-400"><i class="fa-solid fa-xmark text-lg"></i></button></div>
-      <div id="detailContent" class="space-y-4"></div>
-      <div class="flex justify-between gap-2 pt-2 border-t"><button type="button" onclick="closeDetailModal()" class="px-4 py-2 border rounded-lg text-slate-600">閉じる</button><button type="button" id="detailEditButton" onclick="editItemFromDetail()" class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold"><i class="fa-solid fa-pen mr-1"></i>編集画面へ</button></div>
-    </div>
-  </div>
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+      getAuth, 
+      signInWithEmailAndPassword, 
+      createUserWithEmailAndPassword, 
+      signInWithPopup,
+      GoogleAuthProvider,
+      signOut, 
+      onAuthStateChanged 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { 
+      getFirestore, 
+      collection, 
+      addDoc, 
+      updateDoc, 
+      deleteDoc, 
+      doc, 
+      query, 
+      where, 
+      onSnapshot, 
+      serverTimestamp 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-  <!-- JavaScript ロジック -->
-  <script>
-    // --- Firebase 設定 ---
     const firebaseConfig = {
       apiKey: "AIzaSyAoNZm6KwPQuWbC0W65sOh4soLMx1UoUrQ",
       authDomain: "g-account-6f48b.firebaseapp.com",
@@ -229,801 +279,420 @@
       measurementId: "G-0WB2ZMX6K1"
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const googleProvider = new GoogleAuthProvider();
 
-    // --- アプリケーション状態 ---
     let currentUser = null;
-    let currentDbType = 'personal';
-    let selectedTag = null;
-    let map = null;
-    let cloudLoadInProgress = false;
-    let cloudSaveQueue = Promise.resolve();
-    let legacyItemsForMigration = [];
+    let items = [];
+    let searchQuery = '';
+    let selectedTags = new Set();
+    let activeDetailItem = null;
+    let isMasked = true;
 
-    const sampleItems = [];
-    function readLocalJson(key, fallback) {
-      try {
-        const raw = localStorage.getItem(key);
-        if (raw === null) return fallback;
-        const parsed = JSON.parse(raw);
-        return parsed;
-      } catch (err) {
-        console.error('保存データの読み込みに失敗:', key, err);
-        return fallback;
+    // DOM
+    const loading = document.getElementById('loading');
+    const authContainer = document.getElementById('auth-container');
+    const appContainer = document.getElementById('app-container');
+    const authForm = document.getElementById('auth-form');
+    const authEmail = document.getElementById('auth-email');
+    const authPassword = document.getElementById('auth-password');
+    const authError = document.getElementById('auth-error');
+    const userNameText = document.getElementById('user-name-text');
+    const btnLogout = document.getElementById('btn-logout');
+    const btnGoogleLogin = document.getElementById('btn-google-login');
+
+    const itemsList = document.getElementById('items-list');
+    const searchInput = document.getElementById('search-input');
+    const tagFiltersList = document.getElementById('tag-filters-list');
+
+    const itemModal = document.getElementById('item-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const itemForm = document.getElementById('item-form');
+    const itemIdInput = document.getElementById('item-id');
+    const itemTagsInput = document.getElementById('item-tags');
+    const itemContentInput = document.getElementById('item-content');
+    const itemMemoInput = document.getElementById('item-memo');
+    const existingTagsSuggestions = document.getElementById('existing-tags-suggestions');
+    const btnSubmitItem = document.getElementById('btn-submit-item');
+
+    const detailModal = document.getElementById('detail-modal');
+    const detailTagsHeader = document.getElementById('detail-tags-header');
+    const detailMemoContainer = document.getElementById('detail-memo-container');
+    const detailMemo = document.getElementById('detail-memo');
+    const detailCodeBlock = document.getElementById('detail-code-block');
+    const detailBtnCopy = document.getElementById('detail-btn-copy');
+    const detailBtnToggleMask = document.getElementById('detail-btn-toggle-mask');
+    const detailBtnEdit = document.getElementById('detail-btn-edit');
+    const detailBtnDelete = document.getElementById('detail-btn-delete');
+
+    const tagManageModal = document.getElementById('tag-manage-modal');
+    const tagManageList = document.getElementById('tag-manage-list');
+
+    function formatAuthInput(val) {
+      if (!val.includes('@')) {
+        return `${val.trim()}@devvault.local`;
       }
+      return val.trim();
     }
-    legacyItemsForMigration = readLocalJson('smart_item_db', []);
-    if (!Array.isArray(legacyItemsForMigration)) legacyItemsForMigration = [];
-    // 旧版に同梱していた見本商品だけを除去し、ユーザーが登録した商品は保持する。
-    legacyItemsForMigration = legacyItemsForMigration.filter(i => !(i && i.id === 'item_1' && i.jan === '4901777018686' && String(i.name || '').includes('天然水')));
-    // 旧バージョンの個人データを初回ログインまで保護するため、移行候補を別キーに退避。
-    try {
-      if (localStorage.getItem('smart_item_db_legacy_personal') === null) {
-        const legacyPersonal = readLocalJson('smart_item_db_legacy_personal', legacyItemsForMigration.filter(i => i && i.dbType !== 'open')) || [];
-        if (legacyPersonal.length) localStorage.setItem('smart_item_db_legacy_personal', JSON.stringify(legacyPersonal));
-      }
-    } catch (e) { console.warn('旧個人データの移行バックアップに失敗:', e); }
-    // 個人データはログイン後にアカウント別Firestoreから読み込む。未ログイン時はオープンDBのみ表示。
-    let localItems = legacyItemsForMigration.filter(i => i && i.dbType === 'open');
-    let appSettings = readLocalJson('smart_item_settings', { yahooId: "", amazonTag: "" }) || { yahooId: "", amazonTag: "" };
-    let scannerActive = false;
-    let scannerStarting = false;
-    let scanPurpose = 'register';
-    let lastScanCode = '';
-    let lastScanCount = 0;
-    let lastScanAt = 0;
-    let scanQualitySum = 0;
-    let scanSessionId = 0;
-    let scanConfirmed = false;
 
-    document.addEventListener("DOMContentLoaded", () => {
-      initAuth();
-      renderItems();
-      renderTags();
-      setupEnterNavigation();
+    onAuthStateChanged(auth, (user) => {
+      loading.classList.add('hidden');
+      if (user) {
+        currentUser = user;
+        userNameText.textContent = user.displayName || user.email.replace('@devvault.local', '');
+        authContainer.classList.add('hidden');
+        appContainer.classList.remove('hidden');
+        subscribeItems();
+      } else {
+        currentUser = null;
+        authContainer.classList.remove('hidden');
+        appContainer.classList.add('hidden');
+      }
+      lucide.createIcons();
     });
 
-    // --- 認証・アカウント別データ読み込み ---
-    function initAuth() {
-      auth.onAuthStateChanged(async user => {
-        currentUser = user;
-        renderUserInfo();
-        if (user) {
-          await loadAccountItems(user);
-        } else {
-          localItems = legacyItemsForMigration.filter(i => i && i.dbType === 'open');
-          updateStorageStatus('ログインすると個人データを同期', 'text-amber-600');
-          renderTags(); renderItems();
-        }
-      });
-    }
-
-    function updateStorageStatus(message, colorClass = 'text-emerald-600') {
-      const el = document.getElementById('storageStatus');
-      if (!el) return;
-      el.className = colorClass;
-      el.textContent = '· ' + message;
-    }
-
-    function personalCollection(user = currentUser) {
-      if (!user) throw new Error('個人データの保存にはログインが必要です。');
-      return db.collection('users').doc(user.uid).collection('personalItems');
-    }
-
-    async function loadAccountItems(user) {
-      if (cloudLoadInProgress) return;
-      cloudLoadInProgress = true;
-      updateStorageStatus('アカウントデータを読み込み中…', 'text-blue-600');
+    btnGoogleLogin.addEventListener('click', async () => {
+      authError.classList.add('hidden');
       try {
-        const collection = personalCollection(user);
-        let snapshot = await collection.get();
-        let accountItems = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, dbType: 'personal' }));
-
-        // 初回ログイン時のみ、従来の端末保存データをこのアカウントへ移行する。
-        if (snapshot.empty) {
-          const legacyPersonal = readLocalJson('smart_item_db_legacy_personal', legacyItemsForMigration.filter(i => i && i.dbType !== 'open')) || [];
-          if (legacyPersonal.length) {
-            const batch = db.batch();
-            legacyPersonal.forEach(item => {
-              const id = String(item.id || ('item_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)));
-              const ref = collection.doc(id);
-              batch.set(ref, { ...item, id, dbType: 'personal', ownerUid: user.uid });
-            });
-            await batch.commit();
-            try { localStorage.removeItem('smart_item_db_legacy_personal'); } catch (_) {}
-            snapshot = await collection.get();
-            accountItems = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, dbType: 'personal' }));
-          }
-        }
-        const openItems = legacyItemsForMigration.filter(i => i && i.dbType === 'open');
-        localItems = [...openItems, ...accountItems];
-        try { localStorage.setItem('smart_item_db_' + user.uid, JSON.stringify(accountItems)); } catch (e) { console.warn('アカウント別キャッシュを保存できません:', e); }
-        updateStorageStatus('アカウントに保存', 'text-emerald-600');
-        renderTags(); renderItems();
+        await signInWithPopup(auth, googleProvider);
       } catch (err) {
-        console.error('アカウントデータ読み込み失敗:', err);
-        updateStorageStatus('クラウド接続エラー', 'text-red-600');
-        alert('個人データをアカウントから読み込めませんでした。Firestoreのアクセスルールと通信状態を確認してください。\n' + err.message);
-      } finally {
-        cloudLoadInProgress = false;
+        authError.textContent = "Googleログインエラー: " + err.message;
+        authError.classList.remove('hidden');
       }
-    }
+    });
 
-    async function syncPersonalItemsToCloud(user = currentUser, personalItems = localItems.filter(i => i && i.dbType === 'personal')) {
-      if (!user) throw new Error('個人データの保存にはGoogleログインが必要です。');
-      const collection = personalCollection(user);
-      const snapshot = await collection.get();
-      const keepIds = new Set(personalItems.map(i => String(i.id)));
-      const operations = [];
-      personalItems.forEach(item => operations.push({ type: 'set', id: String(item.id), data: { ...item, id: String(item.id), dbType: 'personal', ownerUid: user.uid } }));
-      snapshot.docs.forEach(doc => { if (!keepIds.has(doc.id)) operations.push({ type: 'delete', id: doc.id }); });
-      for (let i = 0; i < operations.length; i += 450) {
-        const batch = db.batch();
-        operations.slice(i, i + 450).forEach(op => {
-          const ref = collection.doc(op.id);
-          if (op.type === 'delete') batch.delete(ref); else batch.set(ref, op.data);
+    authForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      authError.classList.add('hidden');
+      try {
+        await signInWithEmailAndPassword(auth, formatAuthInput(authEmail.value), authPassword.value);
+      } catch (err) {
+        authError.textContent = "ログインエラー: IDまたはパスワードが正しくありません";
+        authError.classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('btn-signup').addEventListener('click', async () => {
+      authError.classList.add('hidden');
+      if(!authEmail.value || !authPassword.value) {
+        authError.textContent = "IDとパスワードを入力してください";
+        authError.classList.remove('hidden');
+        return;
+      }
+      try {
+        await createUserWithEmailAndPassword(auth, formatAuthInput(authEmail.value), authPassword.value);
+      } catch (err) {
+        authError.textContent = "登録エラー: " + err.message;
+        authError.classList.remove('hidden');
+      }
+    });
+
+    btnLogout.addEventListener('click', () => signOut(auth));
+
+    function subscribeItems() {
+      if (!currentUser) return;
+      const loadTimer = setTimeout(() => loading.classList.add('hidden'), 4000);
+
+      onSnapshot(query(collection(db, "items"), where("userId", "==", currentUser.uid)), (snapshot) => {
+        clearTimeout(loadTimer);
+        loading.classList.add('hidden');
+        items = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          let tags = Array.isArray(data.tags) ? data.tags : (typeof data.tags === 'string' ? data.tags.split(',').map(t => t.trim()).filter(Boolean) : []);
+          items.push({ id: doc.id, ...data, tags, content: data.content || '' });
         });
-        await batch.commit();
-      }
-      try { localStorage.setItem('smart_item_db_' + user.uid, JSON.stringify(personalItems)); } catch (e) { console.warn('アカウント別キャッシュ保存失敗:', e); }
-      updateStorageStatus('アカウントに保存', 'text-emerald-600');
-    }
-
-    function setupEnterNavigation() {
-      const form = document.getElementById('itemForm');
-      if (!form) return;
-      form.addEventListener('keydown', event => {
-        if (event.key !== 'Enter' || event.isComposing) return;
-        const target = event.target;
-        if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
-        if (target.type === 'hidden' || target.type === 'button' || target.type === 'submit') return;
-        event.preventDefault();
-        const fields = Array.from(form.querySelectorAll('input:not([type="hidden"]):not([type="button"]):not([type="submit"]), textarea, select'))
-          .filter(el => !el.disabled && el.offsetParent !== null);
-        const index = fields.indexOf(target);
-        if (index >= 0 && index < fields.length - 1) {
-          fields[index + 1].focus();
-          if (typeof fields[index + 1].select === 'function' && fields[index + 1].tagName === 'INPUT' && fields[index + 1].type !== 'date') fields[index + 1].select();
-        } else {
-          form.requestSubmit();
-        }
+        renderTagFilters();
+        renderItems();
+      }, (error) => {
+        clearTimeout(loadTimer);
+        loading.classList.add('hidden');
+        console.error("Firestore Error:", error);
       });
     }
 
-    function loginGoogle() {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      auth.signInWithPopup(provider).catch(err => alert("ログインエラー: " + err.message));
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value.toLowerCase();
+      renderItems();
+    });
+
+    function getAllTags() {
+      const allTags = new Set();
+      items.forEach(item => item.tags?.forEach(t => allTags.add(t)));
+      return Array.from(allTags);
     }
 
-    function logout() {
-      auth.signOut();
+    function renderTagFilters() {
+      const tags = getAllTags();
+      const allSelected = selectedTags.size === 0;
+
+      let html = `<button onclick="toggleTagFilter('ALL')" class="px-2 py-1 rounded text-[11px] font-medium transition ${allSelected ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'}">すべて</button>`;
+      
+      tags.forEach(tag => {
+        const isSelected = selectedTags.has(tag);
+        html += `<button onclick="toggleTagFilter('${escapeJs(tag)}')" class="px-2 py-1 rounded text-[11px] font-medium transition ${isSelected ? 'bg-indigo-600 text-white shadow' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'}">#${escapeHtml(tag)}</button>`;
+      });
+
+      tagFiltersList.innerHTML = html;
     }
 
-    function renderUserInfo() {
-      const el = document.getElementById('userInfoArea');
-      if (currentUser) {
-        el.innerHTML = `
-          <div class="flex items-center space-x-2">
-            <span class="bg-blue-50 text-blue-700 text-xs px-2.5 py-1 rounded-full font-bold border border-blue-200 truncate max-w-[140px]">
-              <i class="fa-solid fa-user mr-1"></i>${currentUser.displayName || currentUser.email}
-            </span>
-            <button onclick="logout()" class="text-xs text-slate-500 hover:text-slate-800">ログアウト</button>
+    window.toggleTagFilter = (tag) => {
+      if (tag === 'ALL') {
+        selectedTags.clear();
+      } else {
+        selectedTags.has(tag) ? selectedTags.delete(tag) : selectedTags.add(tag);
+      }
+      renderTagFilters();
+      renderItems();
+    };
+
+    function renderItems() {
+      const filtered = items.filter(item => {
+        const matchesSearch = item.content.toLowerCase().includes(searchQuery) || 
+                              (item.memo && item.memo.toLowerCase().includes(searchQuery)) ||
+                              (item.tags && item.tags.some(t => t.toLowerCase().includes(searchQuery)));
+        
+        let matchesTags = selectedTags.size === 0 || Array.from(selectedTags).every(t => item.tags?.includes(t));
+        return matchesSearch && matchesTags;
+      });
+
+      if(filtered.length === 0) {
+        itemsList.innerHTML = `<div class="py-12 text-center text-slate-600 text-xs">データがありません</div>`;
+        return;
+      }
+
+      itemsList.innerHTML = filtered.map(item => {
+        const maskedContent = isMasked ? '••••••••••••••••' : item.content;
+        return `
+          <div onclick="openDetail('${item.id}')" class="bg-slate-900 hover:bg-slate-800/80 border border-slate-800 rounded-lg px-3 py-2.5 flex items-center justify-between cursor-pointer transition group">
+            <div class="flex items-center gap-2.5 min-w-0 flex-1 mr-3">
+              <div class="flex items-center gap-1 shrink-0">
+                ${(item.tags || []).map(t => `<span class="text-[10px] bg-indigo-950/80 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800/50 font-medium">#${escapeHtml(t)}</span>`).join('')}
+              </div>
+              <span class="text-xs font-mono text-slate-400 truncate ml-1">${escapeHtml(maskedContent)}</span>
+              ${item.memo ? `<span class="text-[11px] text-slate-500 truncate hidden md:inline ml-2">(${escapeHtml(item.memo)})</span>` : ''}
+            </div>
+            <div class="flex items-center gap-1 shrink-0" onclick="event.stopPropagation()">
+              <button onclick="toggleMaskGlobal(event)" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded transition" title="表示/隠す切替">
+                <i data-lucide="${isMasked ? 'eye' : 'eye-off'}" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="copyToClipboard('${escapeJs(item.content)}')" class="p-1.5 bg-slate-800 hover:bg-indigo-600/30 text-slate-400 hover:text-indigo-300 rounded transition" title="コピー">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="openDetail('${item.id}')" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded transition" title="詳細">
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
           </div>
         `;
-      } else {
-        el.innerHTML = `
-          <button onclick="loginGoogle()" title="ログインすると個人DBの商品データがアカウントに保存・同期されます。" class="bg-slate-900 text-white text-xs px-3.5 py-1.5 rounded-lg hover:bg-slate-800 font-medium transition shadow-sm">
-            <i class="fa-brands fa-google mr-1.5"></i>Googleログイン
-          </button>
-        `;
-      }
-    }
-
-    // --- DB切り替え & タブ ---
-    function setDbType(type) {
-      if (type === 'personal' && !currentUser) {
-        alert('個人DBを使うには、先にGoogleログインしてください。個人データはログイン中のアカウントに保存されます。');
-        loginGoogle();
-        return;
-      }
-      currentDbType = type;
-      const btnP = document.getElementById('dbTypePersonal');
-      const btnO = document.getElementById('dbTypeOpen');
-
-      if (type === 'personal') {
-        btnP.className = "px-4 py-1.5 text-xs font-semibold rounded-md bg-white text-blue-600 shadow-sm transition";
-        btnO.className = "px-4 py-1.5 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900 transition";
-      } else {
-        btnO.className = "px-4 py-1.5 text-xs font-semibold rounded-md bg-white text-blue-600 shadow-sm transition";
-        btnP.className = "px-4 py-1.5 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900 transition";
-      }
-      renderItems();
-    }
-
-    function switchTab(tab) {
-      ['items', 'map'].forEach(t => {
-        document.getElementById(`view-${t}`).classList.add('hidden');
-        document.getElementById(`tab-${t}`).className = "py-2.5 text-slate-600 hover:text-blue-600 whitespace-nowrap";
-      });
-      document.getElementById(`view-${tab}`).classList.remove('hidden');
-      document.getElementById(`tab-${tab}`).className = "py-2.5 nav-active whitespace-nowrap";
-
-      if (tab === 'map' && !map) {
-        initMap();
-      } else if (tab === 'map' && map) {
-        setTimeout(() => map.invalidateSize(), 100);
-      }
-    }
-
-    // --- 商品表示ロジック ---
-    function renderItems() {
-      const container = document.getElementById('itemList');
-      const search = document.getElementById('searchInput').value.trim().toLowerCase();
-      const filtered = localItems.filter(item => {
-        if (item.dbType !== currentDbType) return false;
-        if (search) {
-          const nameText = [item.maker, item.name, item.flavor, item.content].filter(Boolean).join(' ').toLowerCase();
-          const matchJan = item.jan && String(item.jan).includes(search);
-          const matchStore = item.stores && item.stores.some(st => [st.name, st.branch].filter(Boolean).join(' ').toLowerCase().includes(search));
-          const matchTags = (item.tags || []).some(tag => String(tag).toLowerCase().includes(search));
-          return nameText.includes(search) || matchJan || matchStore || matchTags;
-        }
-        return true;
-      });
-      if (!filtered.length) {
-        container.innerHTML = `<div class="col-span-full py-10 text-center text-slate-400"><i class="fa-solid fa-box-open text-2xl"></i><p class="text-xs mt-2">条件に一致する商品はありません</p></div>`;
-        return;
-      }
-      container.className = 'flex flex-col gap-2';
-      container.innerHTML = filtered.map(item => {
-        const maker = item.maker ? `<p class="text-[10px] leading-tight text-slate-400">${escapeHtml(item.maker)}</p>` : '';
-        const flavor = item.flavor ? `<p class="text-[11px] leading-tight text-slate-600">${escapeHtml(item.flavor)}</p>` : '';
-        const content = item.content ? `<span class="text-[10px] text-slate-400 whitespace-nowrap">${escapeHtml(item.content)}</span>` : '';
-        const jan = item.jan ? escapeHtml(item.jan) : 'JAN未登録';
-        const latestStore = Array.isArray(item.stores) && item.stores.length ? [...item.stores].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0] : null;
-        const price = latestStore && latestStore.price !== '' && latestStore.price != null ? Number(latestStore.price) : null;
-        const taxRate = item.taxType === 'other' ? 0.10 : 0.08;
-        const priceHtml = price !== null && Number.isFinite(price) ? `<div class="mt-1"><span class="text-xs font-bold text-slate-800">税抜 ¥${price.toLocaleString('ja-JP')}</span> <span class="text-[10px] text-slate-500">税込 ¥${Math.round(price * (1 + taxRate)).toLocaleString('ja-JP')}</span></div>` : '';
-        const safeId = String(item.id).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        return `
-          <article class="bg-white rounded-lg border border-slate-200 px-3 py-2.5 flex items-center gap-3 min-w-0">
-            <div class="flex-1 min-w-0 space-y-0.5">
-              ${maker}
-              <div class="flex items-start gap-2 min-w-0"><h3 class="font-bold text-slate-900 text-sm leading-snug break-words flex-1 min-w-0">${escapeHtml(item.name || '名称未設定')}</h3>${content ? `<span class="shrink-0 pt-0.5">${content}</span>` : ''}</div>
-              ${flavor}
-              ${priceHtml}
-              <div class="text-[10px] text-slate-500 font-mono pt-0.5">JAN: ${jan}</div>
-            </div>
-            <div class="flex flex-col gap-1 shrink-0">
-              <button type="button" onclick="showItemDetails('${safeId}')" class="px-2.5 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold"><i class="fa-solid fa-circle-info mr-1"></i>詳細</button>
-              ${item.jan ? `<button type="button" onclick="copyJan('${String(item.jan).replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-md border border-slate-200 text-slate-500 text-[10px]"><i class="fa-regular fa-copy mr-1"></i>JAN</button>` : ''}
-            </div>
-          </article>`;
       }).join('');
+
+      lucide.createIcons();
     }
 
-    let detailItemId = null;
-    function showItemDetails(id) {
-      const item = localItems.find(i => String(i.id) === String(id));
-      if (!item) return;
-      detailItemId = item.id;
-      const taxRate = item.taxType === 'other' ? 0.10 : 0.08;
-      const stores = Array.isArray(item.stores) ? item.stores.map((st, originalIndex) => ({ ...st, _originalIndex: originalIndex })).sort((a,b) => String(b.date||'').localeCompare(String(a.date||''))) : [];
-      const priceHistory = stores.length ? stores.map((st, index) => {
-        const price = st.price !== '' && st.price != null && Number.isFinite(Number(st.price)) ? Number(st.price) : null;
-        const taxType = st.taxType || item.taxType || 'food';
-        const rate = taxType === 'other' ? 0.10 : 0.08;
-        return `<div class="border-b border-slate-100 py-2 text-xs"><div class="flex justify-between gap-2"><div class="min-w-0 flex-1"><div class="font-semibold text-slate-800">${escapeHtml([st.name, st.branch].filter(Boolean).join(' / ') || '店舗未設定')}</div><div class="text-slate-500">${escapeHtml(st.date || '日付未登録')} · ${taxType === 'other' ? '10%' : '8%'}</div></div><div class="text-right shrink-0">${price === null ? '価格未登録' : `<div class="font-bold">税抜 ¥${price.toLocaleString('ja-JP')}</div><div class="text-[10px] text-slate-500">税込 ¥${Math.round(price*(1+rate)).toLocaleString('ja-JP')}</div>`}</div></div><div class="flex justify-end gap-2 mt-1"><button type="button" onclick="editStoreRecord(decodeURIComponent('${encodeURIComponent(String(item.id))}'), ${st._originalIndex})" class="px-2 py-1 border rounded text-[10px] text-blue-700">店舗データを編集</button><button type="button" onclick="deleteStoreRecord(decodeURIComponent('${encodeURIComponent(String(item.id))}'), ${st._originalIndex})" class="px-2 py-1 border rounded text-[10px] text-red-600">この記録を削除</button></div></div>`;
-      }).join('') : '<p class="text-xs text-slate-400 py-2">価格の記録はまだありません。</p>';
-      const query = item.jan || [item.maker,item.name,item.flavor,item.content].filter(Boolean).join(' ');
-      const q = encodeURIComponent(query);
-      const janText = item.jan ? escapeHtml(item.jan) : '未登録';
-      const tags = (item.tags || []).length ? item.tags.map(t => `<span class="px-2 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px]">${escapeHtml(t)}</span>`).join('') : '<span class="text-xs text-slate-400">タグなし</span>';
-      const sameJan = item.jan ? localItems.filter(other => other.id !== item.id && other.dbType === item.dbType && String(other.jan || '') === String(item.jan)) : [];
-      const similarJan = item.jan && String(item.jan).length > 3 ? localItems.filter(other => other.id !== item.id && other.dbType === item.dbType && String(other.jan || '').length === String(item.jan).length && String(other.jan).slice(0, -3) === String(item.jan).slice(0, -3) && String(other.jan) !== String(item.jan)) : [];
-      const relatedBlock = (title, list, note) => list.length ? `<section class="space-y-2"><h4 class="font-bold text-sm text-slate-800">${title}</h4>${note ? `<p class="text-[10px] text-slate-500">${note}</p>` : ''}<div class="space-y-1">${list.map(other => `<button type="button" onclick="showItemDetails(decodeURIComponent('${encodeURIComponent(String(other.id))}'))" class="w-full text-left border rounded-lg p-2 hover:bg-slate-50"><span class="block text-[10px] text-slate-500">${escapeHtml(other.maker || 'メーカー未登録')}</span><span class="block text-xs font-semibold text-slate-800">${escapeHtml(other.name || '名称未設定')}</span><span class="block text-[10px] font-mono text-slate-500">JAN：${escapeHtml(other.jan || '未登録')}</span></button>`).join('')}</div></section>` : '';
-      const sameJanBlock = relatedBlock('同一JANの商品', sameJan, '同じJANコードで登録されている商品です。選択すると、その商品の詳細を確認できます。');
-      const similarJanBlock = relatedBlock('類似品かもしれません', similarJan, 'JANコードの下3桁以外が一致する商品です。別商品とは限らないため、商品名・内容量などを確認してください。');
-      document.getElementById('detailContent').innerHTML = `
-        <section class="space-y-1"><p class="text-[11px] text-slate-500">${escapeHtml(item.maker || 'メーカー未登録')}</p><div class="flex items-start gap-2"><h2 class="text-lg font-bold text-slate-900 flex-1">${escapeHtml(item.name || '名称未設定')}</h2><span class="text-xs text-slate-500 whitespace-nowrap">${escapeHtml(item.content || '')}</span></div>${item.flavor ? `<p class="text-sm text-slate-600">${escapeHtml(item.flavor)}</p>` : ''}<p class="text-xs font-mono text-slate-500">JAN：${janText}</p><div class="flex flex-wrap gap-1 pt-1">${tags}</div>${item.memo ? `<p class="text-sm whitespace-pre-wrap bg-slate-50 rounded-lg p-3">${escapeHtml(item.memo)}</p>` : ''}</section>
-        ${sameJanBlock}
-        ${similarJanBlock}
-        <section class="space-y-2"><h4 class="font-bold text-sm text-slate-800"><i class="fa-solid fa-clock-rotate-left mr-1 text-blue-600"></i>登録された過去の価格データ</h4><div>${priceHistory}</div></section>
-        <section class="space-y-2"><h4 class="font-bold text-sm text-slate-800"><i class="fa-solid fa-cart-shopping mr-1 text-blue-600"></i>ECサイトで探す</h4><div class="grid grid-cols-2 gap-2"><a target="_blank" rel="noopener noreferrer" href="https://www.amazon.co.jp/s?k=${q}" class="text-center rounded-lg border border-slate-200 p-2 text-xs font-semibold hover:bg-slate-50"><i class="fa-brands fa-amazon mr-1"></i>Amazon</a><a target="_blank" rel="noopener noreferrer" href="https://search.rakuten.co.jp/search/mall/${q}/" class="text-center rounded-lg border border-slate-200 p-2 text-xs font-semibold hover:bg-slate-50">楽天市場</a><a target="_blank" rel="noopener noreferrer" href="https://shopping.yahoo.co.jp/search?p=${q}" class="text-center rounded-lg border border-slate-200 p-2 text-xs font-semibold hover:bg-slate-50">Yahoo!ショッピング</a><a target="_blank" rel="noopener noreferrer" href="https://www.google.com/search?tbm=shop&q=${q}" class="text-center rounded-lg border border-slate-200 p-2 text-xs font-semibold hover:bg-slate-50"><i class="fa-brands fa-google mr-1"></i>Google商品検索</a></div></section>`;
-      const editBtn = document.getElementById('detailEditButton');
-      editBtn.classList.toggle('hidden', item.dbType === 'personal' && !currentUser);
-      document.getElementById('detailModal').classList.remove('hidden');
-    }
-    function editStoreRecord(itemId, index) {
-      const item = localItems.find(i => String(i.id) === String(itemId));
-      if (!item || !Array.isArray(item.stores) || !item.stores[index]) return;
-      if (item.dbType !== 'open' && !currentUser) { alert('個人データを編集するにはGoogleログインが必要です。'); return; }
-      const st = item.stores[index];
-      const name = prompt('店舗名', st.name || ''); if (name === null) return;
-      const branch = prompt('支店名（不要なら空欄）', st.branch || ''); if (branch === null) return;
-      const date = prompt('登録日（YYYY-MM-DD）', st.date || ''); if (date === null) return;
-      const priceText = prompt('税抜価格（数字）', st.price == null ? '' : String(st.price)); if (priceText === null) return;
-      if (priceText.trim() !== '' && (!Number.isFinite(Number(priceText)) || Number(priceText) < 0)) { alert('価格は0以上の数字で入力してください。'); return; }
-      item.stores[index] = { ...st, name: name.trim(), branch: branch.trim(), date: date.trim(), price: priceText.trim() === '' ? '' : Number(priceText) };
-      item.updatedAt = new Date().toISOString();
-      if (!saveLocalStorage()) return;
-      showItemDetails(item.id); renderItems();
-    }
-    function deleteStoreRecord(itemId, index) {
-      const item = localItems.find(i => String(i.id) === String(itemId));
-      if (!item || !Array.isArray(item.stores) || !item.stores[index]) return;
-      if (item.dbType !== 'open' && !currentUser) { alert('個人データを編集するにはGoogleログインが必要です。'); return; }
-      const st = item.stores[index];
-      if (!confirm(`この店舗の価格記録を削除しますか？\n${[st.name, st.branch, st.date].filter(Boolean).join(' / ')}`)) return;
-      item.stores.splice(index, 1);
-      item.updatedAt = new Date().toISOString();
-      if (!saveLocalStorage()) return;
-      showItemDetails(item.id); renderItems();
-    }
-    function closeDetailModal() { document.getElementById('detailModal').classList.add('hidden'); }
-    function editItemFromDetail() {
-      if (!detailItemId) return;
-      const id = detailItemId;
-      closeDetailModal();
-      editItem(id);
-    }
-
-    function copyJan(jan) {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(String(jan)).then(() => alert('JANコードをコピーしました')).catch(() => prompt('JANコードをコピーしてください', jan));
-      } else {
-        prompt('JANコードをコピーしてください', jan);
-      }
-    }
-
-    // --- タグ操作：全タグ一覧は表示せず、入力文字に合う候補だけ予測表示 ---
-    function renderTags() {
-      const container = document.getElementById('tagContainer');
-      if (container) container.innerHTML = '';
-    }
-    function toggleTag(tag) { /* タグは入力時の予測候補として利用 */ }
-    function filterItems() { renderItems(); }
-
-    function splitTags(value) {
-      return [...new Set(String(value || '').split(/[,、]/).map(t => t.trim()).filter(Boolean))];
-    }
-
-    function renderTagSuggestions() {
-      const input = document.getElementById('formTags');
-      const box = document.getElementById('tagSuggestions');
-      if (!input || !box) return;
-      const value = input.value;
-      const parts = value.split(/[,、]/);
-      const current = (parts[parts.length - 1] || '').trim().toLowerCase();
-      const used = parts.slice(0, -1).map(t => t.trim().toLowerCase()).filter(Boolean);
-      // 入力が空のときは候補を大量表示しない。入力文字に一致する既存タグだけ候補に出す。
-      if (!current) { box.innerHTML = ''; return; }
-      const all = new Set();
-      localItems.forEach(item => (item.tags || []).forEach(tag => all.add(String(tag))));
-      const suggestions = [...all]
-        .filter(tag => !used.includes(tag.toLowerCase()) && tag.toLowerCase().includes(current))
-        .sort((a, b) => (a.toLowerCase().startsWith(current) ? 0 : 1) - (b.toLowerCase().startsWith(current) ? 0 : 1))
-        .slice(0, 5);
-      box.innerHTML = suggestions.map(tag => `<button type="button" class="px-2 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-100 text-[10px]" onclick="addTagSuggestion('${escapeHtml(tag).replace(/'/g, '&#39;')}')">${escapeHtml(tag)}</button>`).join('');
-    }
-
-    function addTagSuggestion(tag) {
-      const input = document.getElementById('formTags');
-      const parts = input.value.split(/[,、]/);
-      parts.pop();
-      const existing = parts.map(t => t.trim()).filter(Boolean);
-      if (!existing.some(t => t.toLowerCase() === tag.toLowerCase())) existing.push(tag);
-      input.value = existing.join('、') + '、';
-      input.focus();
-      renderTagSuggestions();
-    }
-
-    // --- JANコードカメラ読み取り（JAN Master ProのQuagga2方式） ---
-    function openScanModal() {
-      scanPurpose = 'register';
-      document.getElementById('scanModal').classList.remove('hidden');
-      startScanCamera();
-    }
-
-    function openJanFieldScanModal() {
-      scanPurpose = 'registerField';
-      document.getElementById('scanModal').classList.remove('hidden');
-      startScanCamera();
-    }
-
-    function openSearchScanModal() {
-      scanPurpose = 'search';
-      document.getElementById('scanModal').classList.remove('hidden');
-      startScanCamera();
-    }
-
-    async function startScanCamera() {
-      if (scannerActive || scannerStarting) return;
-      scannerStarting = true;
-      scanConfirmed = false;
-      const thisSession = ++scanSessionId;
-      const status = document.getElementById('scanStatus');
-      status.textContent = 'カメラを起動しています…';
-      const reader = document.getElementById('reader');
-      reader.innerHTML = '';
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        scannerStarting = false;
-        status.textContent = 'カメラを利用できません。HTTPSで開いているか確認してください。';
-        return;
-      }
-      if (!window.Quagga || typeof Quagga.init !== 'function') {
-        scannerStarting = false;
-        status.textContent = 'バーコード読取ライブラリを読み込めませんでした。';
-        return;
-      }
-      try {
-        try { Quagga.offDetected(onScanDetected); Quagga.stop(); } catch (_) {}
-        Quagga.init({
-          inputStream: { name: 'Live', type: 'LiveStream', target: reader, constraints: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 }, aspectRatio: { ideal: 1.777 } }, area: { top: '28%', right: '6%', left: '6%', bottom: '28%' } },
-          locator: { patchSize: 'medium', halfSample: false },
-          numOfWorkers: navigator.hardwareConcurrency ? Math.min(3, Math.max(1, navigator.hardwareConcurrency - 1)) : 2,
-          frequency: 15,
-          decoder: { readers: ['ean_reader', 'ean_8_reader', 'upc_reader', 'i2of5_reader'] },
-          locate: true
-        }, err => {
-          if (thisSession !== scanSessionId) { try { Quagga.stop(); } catch (_) {} return; }
-          scannerStarting = false;
-          if (err) {
-            console.error('Quagga init error:', err);
-            status.textContent = 'カメラを起動できませんでした。カメラ権限とHTTPSを確認してください。';
-            return;
-          }
-          try {
-            Quagga.offDetected(onScanDetected);
-            Quagga.onDetected(onScanDetected);
-            Quagga.start();
-            scannerActive = true;
-            scannerStarting = false;
-            status.textContent = 'バーコード全体を緑の枠に水平に合わせ、ピントが合うまで静止してください。3回連続で一致すると停止します。';
-            const track = Quagga.CameraAccess && Quagga.CameraAccess.getActiveTrack ? Quagga.CameraAccess.getActiveTrack() : null;
-            if (track && track.applyConstraints) {
-              const caps = track.getCapabilities ? track.getCapabilities() : {};
-              if (caps.focusMode && caps.focusMode.includes('continuous')) track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
-            }
-          } catch (err2) {
-            console.error('Quagga start error:', err2);
-            scannerStarting = false;
-            stopScanCamera();
-            status.textContent = 'カメラ開始に失敗しました。再読み込みをお試しください。';
-          }
-        });
-      } catch (err) {
-        console.error(err);
-        scannerStarting = false;
-        status.textContent = 'カメラ設定でエラーが発生しました。';
-      }
-    }
-
-    function validJanOrItf(code) {
-      const value = String(code || '').replace(/\D/g, '');
-      if (!/^\d{8}$|^\d{12}$|^\d{13}$|^\d{14}$/.test(value)) return false;
-      const body = value.slice(0, -1).split('').reverse();
-      let sum = 0;
-      body.forEach((digit, index) => sum += Number(digit) * (index % 2 === 0 ? 3 : 1));
-      return (10 - (sum % 10)) % 10 === Number(value.slice(-1));
-    }
-
-    function onScanDetected(result) {
-      if (!scannerActive || scanConfirmed) return;
-      const raw = result && result.codeResult && result.codeResult.code;
-      const code = String(raw || '').replace(/\D/g, '');
-      if (!validJanOrItf(code)) return;
-      const now = Date.now();
-      if (code === lastScanCode && now - lastScanAt < 2600) lastScanCount++;
-      else { lastScanCode = code; lastScanCount = 1; scanQualitySum = 0; }
-      lastScanAt = now;
-      // チェックデジットが正しい同一コードを3回連続で検出した場合だけ確定する。
-      if (lastScanCount < 3) return;
-      scanConfirmed = true;
-      lastScanCount = 0;
-      document.getElementById('scanStatus').textContent = '読み取り成功：' + code + '（カメラ停止中…）';
-      stopScanCamera();
-      setTimeout(() => {
-        const modal = document.getElementById('scanModal');
-        if (modal && !modal.classList.contains('hidden')) modal.classList.add('hidden');
-        if (scanPurpose === 'search') {
-          const searchInput = document.getElementById('searchInput');
-          searchInput.value = code;
-          renderItems();
-          searchInput.focus();
-          document.getElementById('scanStatus').textContent = '検索コード：' + code;
-          scanPurpose = 'register';
-        } else if (scanPurpose === 'registerField') {
-          document.getElementById('formJan').value = code;
-          document.getElementById('scanStatus').textContent = 'JAN入力完了：' + code;
-          document.getElementById('formJan').focus();
-          scanPurpose = 'register';
-        } else {
-          openItemModalWithJan(code);
-        }
-      }, 120);
-    }
-
-    function stopScanCamera() {
-      scannerActive = false;
-      scannerStarting = false;
-      scanSessionId++; // 起動途中のコールバックが後からカメラを再開しないよう無効化
-      try { if (window.Quagga) { Quagga.offDetected(onScanDetected); Quagga.stop(); } } catch (err) { console.debug('scanner cleanup', err); }
-      try { if (window.Quagga && Quagga.CameraAccess && Quagga.CameraAccess.release) Quagga.CameraAccess.release(); } catch (_) {}
-      const reader = document.getElementById('reader');
-      if (reader) reader.querySelectorAll('video').forEach(v => {
-        try { v.pause(); const stream = v.srcObject; if (stream) stream.getTracks().forEach(t => { t.stop(); }); v.srcObject = null; } catch (_) {}
-      });
-    }
-
-    function restartScanCamera() {
-      stopScanCamera();
-      lastScanCode = ''; lastScanCount = 0; lastScanAt = 0; scanQualitySum = 0; scanConfirmed = false;
-      startScanCamera();
-    }
-
-    function closeScanModal() {
-      stopScanCamera();
-      document.getElementById('scanModal').classList.add('hidden');
-    }
-
-    function openItemModalWithJan(jan) {
-      openItemModal();
-      document.getElementById('formJan').value = jan;
-      // 読取直後の外部検索は自動実行せず、商品登録を優先。必要ならYahoo!検索を押す。
-      document.getElementById('formName').focus();
-    }
-
-    // --- Yahoo! API呼び出し (HTML単体でCORS回避プロキシ経由) ---
-    async function fetchProductByYahooApi(searchQuery = "") {
-      const clientId = appSettings.yahooId;
-      const jan = searchQuery || document.getElementById('formJan').value;
-      const name = document.getElementById('formName').value;
-      const query = jan || name;
-
-      if (!query) {
-        alert("商品名またはJANコードを入力してください");
-        return;
-      }
-
-      if (!clientId) {
-        alert("Yahoo! APIの Client ID が設定されていません。「API・EC設定」タブから登録してください。");
-        return;
-      }
-
-      const btn = document.getElementById('apiSearchBtn');
-      if (!btn) return;
-      btn.disabled = true;
-      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i>検索中...`;
-
-      try {
-        // JANらしい入力はJAN専用パラメータで検索し、ショップ独自の商品コードをJANと誤認しない。
-        const params = new URLSearchParams({ appid: clientId, results: '10' });
-        if (/^\d{8}$|^\d{12,14}$/.test(query)) params.set('jan_code', query);
-        else params.set('query', query);
-        const targetUrl = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?${params.toString()}`;
-        // 暫定プロキシ。公開運用ではAPIキーをサーバー側に置いた自前の中継処理を推奨。
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-        const res = await fetch(proxyUrl);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        const hits = Array.isArray(data.hits) ? data.hits : [];
-        const item = hits.find(hit => !/^\d{8}$|^\d{12,14}$/.test(query) || String(hit.janCode || '') === query) || hits[0];
-
-        if (item) {
-          document.getElementById('formName').value = item.name || document.getElementById('formName').value;
-          // APIの code はショップの商品コードなので、janCodeがある場合だけJAN欄を更新する。
-          if (item.janCode) document.getElementById('formJan').value = item.janCode;
-          if (item.price !== undefined && item.price !== null) {
-            document.getElementById('formPrice').value = item.price;
-            document.getElementById('formStore').value = (item.seller && item.seller.name) ? item.seller.name : 'Yahoo!ショッピング';
-          }
-          alert(`Yahoo!ショッピングから商品情報を取得しました。\n価格: ¥${Number(item.price || 0).toLocaleString()}\n※商品・JANの一致を確認してから保存してください。`);
-        } else {
-          alert('該当する商品が見つかりませんでした。');
-        }
-      } catch (e) {
-        console.error('API呼び出しエラー', e);
-        alert('API検索に失敗しました。Client ID、APIの利用条件、通信状態を確認してください。');
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-magnifying-glass mr-1"></i>Yahoo!検索`;
-      }
-    }
-
-    // --- モーダル・商品保存・削除 ---
-    function openItemModal() {
-      if (currentDbType === 'personal' && !currentUser) {
-        alert('個人DBへの登録にはGoogleログインが必要です。');
-        loginGoogle();
-        return;
-      }
-      document.getElementById('itemForm').reset();
-      document.getElementById('formTaxType').value = 'food';
-      document.getElementById('editItemId').value = '';
-      document.getElementById('modalTitle').textContent = '商品を新規登録';
-      document.getElementById('deleteBtn').classList.add('hidden');
-      document.getElementById('itemModal').classList.remove('hidden');
-      renderTagSuggestions();
-    }
-
-    function editItem(id) {
-      const item = localItems.find(i => i.id === id);
-      if (!item) return;
-      if (item.dbType !== 'open' && !currentUser) {
-        alert('個人データを編集するにはGoogleログインが必要です。');
-        loginGoogle();
-        return;
-      }
-      currentDbType = item.dbType || 'personal';
-
-      document.getElementById('editItemId').value = item.id;
-      document.getElementById('formMaker').value = item.maker || '';
-      document.getElementById('formName').value = item.name || '';
-      document.getElementById('formFlavor').value = item.flavor || '';
-      document.getElementById('formContent').value = item.content || '';
-      document.getElementById('formTaxType').value = item.taxType === 'other' ? 'other' : 'food';
-      document.getElementById('formJan').value = item.jan || '';
-      document.getElementById('formTags').value = (item.tags || []).join('、');
-      document.getElementById('formMemo').value = item.memo || '';
-      if (item.stores && item.stores.length > 0) {
-        const latestStore = [...item.stores].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0];
-        document.getElementById('formStore').value = latestStore.name || '';
-        document.getElementById('formBranch').value = latestStore.branch || '';
-        document.getElementById('formPrice').value = latestStore.price;
-        document.getElementById('formDate').value = latestStore.date || '';
-      }
-      document.getElementById('modalTitle').textContent = '商品を編集';
-      document.getElementById('deleteBtn').classList.remove('hidden');
-      document.getElementById('itemModal').classList.remove('hidden');
-      renderTagSuggestions();
-    }
-
-    function closeItemModal() {
-      document.getElementById('itemModal').classList.add('hidden');
-    }
-
-    function handleSaveItem(e) {
-      e.preventDefault();
-      const id = document.getElementById('editItemId').value || 'item_' + Date.now();
-      const maker = document.getElementById('formMaker').value.trim();
-      const name = document.getElementById('formName').value.trim();
-      const flavor = document.getElementById('formFlavor').value.trim();
-      const content = document.getElementById('formContent').value.trim();
-      const taxType = document.getElementById('formTaxType').value === 'other' ? 'other' : 'food';
-      const jan = document.getElementById('formJan').value;
-      const tagsStr = document.getElementById('formTags').value;
-      const storeName = document.getElementById('formStore').value;
-      const storeBranch = document.getElementById('formBranch').value;
-      const price = document.getElementById('formPrice').value;
-      const date = document.getElementById('formDate').value || new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-      const memo = document.getElementById('formMemo').value;
-
-      const tags = splitTags(tagsStr);
-      const idx = localItems.findIndex(i => i.id === id);
-      const existing = idx >= 0 ? localItems[idx] : null;
-      // 編集時は過去の店舗価格を保持。入力された店舗だけを追加・更新する。
-      const stores = existing && Array.isArray(existing.stores) ? [...existing.stores] : [];
-      if (storeName.trim() && price !== '' && Number.isFinite(Number(price)) && Number(price) >= 0) {
-        const normalizedName = storeName.trim();
-        const normalizedBranch = storeBranch.trim();
-        const storeIdx = stores.findIndex(st => String(st.name).trim().toLowerCase() === normalizedName.toLowerCase() && String(st.branch || '').trim().toLowerCase() === normalizedBranch.toLowerCase() && String(st.date || '') === date);
-        const record = { name: normalizedName, branch: normalizedBranch, price: Number(price), date };
-        if (storeIdx >= 0) stores[storeIdx] = record;
-        else stores.push(record);
-      }
-      const newItem = { id, maker, name, flavor, content, taxType, jan: jan.trim(), tags, memo: memo.trim(), stores, dbType: existing ? existing.dbType : currentDbType, updatedAt: new Date().toISOString() };
-      if (idx >= 0) localItems[idx] = newItem;
-      else localItems.unshift(newItem);
-
-      if (!saveLocalStorage()) return;
-      closeItemModal();
-      renderTags();
+    window.toggleMaskGlobal = (e) => {
+      e.stopPropagation();
+      isMasked = !isMasked;
       renderItems();
-    }
+    };
 
-    function handleDeleteItem() {
-      const id = document.getElementById('editItemId').value;
-      if (!id) return;
+    window.openDetail = (id) => {
+      const item = items.find(i => i.id === id);
+      if(!item) return;
+      activeDetailItem = item;
+      
+      detailTagsHeader.innerHTML = (item.tags || []).map(t => `<span class="text-[11px] bg-indigo-950 border border-indigo-800/60 text-indigo-300 px-2.5 py-0.5 rounded font-medium">#${escapeHtml(t)}</span>`).join('');
 
-      if (confirm("この商品をデータベースから削除してもよろしいですか？")) {
-        localItems = localItems.filter(i => i.id !== id);
-        if (!saveLocalStorage()) return;
-        closeItemModal();
-        renderTags();
-        renderItems();
+      if(item.memo) {
+        detailMemo.textContent = item.memo;
+        detailMemoContainer.classList.remove('hidden');
+      } else {
+        detailMemoContainer.classList.add('hidden');
       }
-    }
 
-    // --- DBマージ ---
-    function triggerMerge() {
-      const personal = localItems.filter(i => i.dbType === 'personal');
-      const open = localItems.filter(i => i.dbType === 'open');
-      if (!open.length) { alert('マージ対象のオープンDB商品がありません。'); return; }
-      if (!confirm('オープンDBの商品情報を個人DBに取り込みます。同じJANの商品は店舗価格・タグを統合し、個人のメモは保持します。続行しますか？')) return;
-      let added = 0, merged = 0;
-      open.forEach(source => {
-        const target = source.jan ? localItems.find(i => i.dbType === 'personal' && i.jan && i.jan === source.jan) : null;
-        if (!target) {
-          const copy = JSON.parse(JSON.stringify(source));
-          copy.id = 'item_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-          copy.dbType = 'personal'; copy.importedFrom = source.id;
-          localItems.unshift(copy); added++;
-        } else {
-          const stores = Array.isArray(target.stores) ? [...target.stores] : [];
-          (source.stores || []).forEach(st => {
-            const duplicate = stores.some(x => String(x.name).trim().toLowerCase() === String(st.name).trim().toLowerCase() && String(x.branch || '').trim().toLowerCase() === String(st.branch || '').trim().toLowerCase() && String(x.date || '') === String(st.date || '') && Number(x.price) === Number(st.price));
-            if (!duplicate) stores.push({ ...st });
-          });
-          target.stores = stores;
-          target.tags = [...new Set([...(target.tags || []), ...(source.tags || [])])];
-          if (!target.name && source.name) target.name = source.name;
-          target.updatedAt = new Date().toISOString();
-          merged++;
+      detailCodeBlock.textContent = item.content || '';
+      
+      const pre = document.getElementById('detail-content-pre');
+      pre.classList.add('select-none', 'blur-sm');
+      detailBtnToggleMask.innerHTML = `<i data-lucide="eye" class="w-3 h-3"></i> 表示/隠す`;
+
+      detailModal.classList.remove('hidden');
+      lucide.createIcons();
+    };
+
+    document.getElementById('btn-close-detail').addEventListener('click', () => detailModal.classList.add('hidden'));
+
+    detailBtnCopy.addEventListener('click', () => {
+      if(activeDetailItem) copyToClipboard(activeDetailItem.content);
+    });
+
+    detailBtnToggleMask.addEventListener('click', () => {
+      const pre = document.getElementById('detail-content-pre');
+      if(pre.classList.contains('select-none')) {
+        pre.classList.remove('select-none', 'blur-sm');
+        detailBtnToggleMask.innerHTML = `<i data-lucide="eye-off" class="w-3 h-3"></i> 隠す`;
+      } else {
+        pre.classList.add('select-none', 'blur-sm');
+        detailBtnToggleMask.innerHTML = `<i data-lucide="eye" class="w-3 h-3"></i> 表示`;
+      }
+      lucide.createIcons();
+    });
+
+    detailBtnEdit.addEventListener('click', () => {
+      detailModal.classList.add('hidden');
+      editItem(activeDetailItem.id);
+    });
+
+    detailBtnDelete.addEventListener('click', async () => {
+      if(activeDetailItem && confirm("この項目を削除しますか？")) {
+        try {
+          await deleteDoc(doc(db, "items", activeDetailItem.id));
+          detailModal.classList.add('hidden');
+        } catch(err) {
+          alert("削除失敗: " + err.message);
         }
-      });
-      if (!saveLocalStorage()) return;
-      renderTags(); renderItems();
-      alert(`マージ完了：新規取り込み ${added} 件、既存商品の統合 ${merged} 件。\n元のオープンDB商品は削除していません。`);
-    }
-
-    function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
-
-    // --- 店舗マップ (Leaflet) ---
-    function initMap() {
-      map = L.map('map').setView([34.769, 137.391], 13);
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-      }).addTo(map);
-
-      const known = localItems.flatMap(item => (item.stores || []).filter(st => Number.isFinite(Number(st.lat)) && Number.isFinite(Number(st.lng))).map(st => ({ ...st, itemName: item.name })));
-      known.forEach(st => L.marker([Number(st.lat), Number(st.lng)]).addTo(map).bindPopup(`<b>${escapeHtml(st.name)}</b><br>${escapeHtml(st.itemName)} ¥${Number(st.price).toLocaleString()}`));
-      if (!known.length) { const note = L.control({ position: 'bottomleft' }); note.onAdd = function() { const div = L.DomUtil.create('div', 'bg-white px-3 py-2 rounded shadow text-xs'); div.textContent = '店舗の位置情報は未登録です。現在地表示は利用できます。'; return div; }; note.addTo(map); }
-    }
-
-    function locateUser() {
-      if (navigator.geolocation && map) {
-        navigator.geolocation.getCurrentPosition(pos => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          map.setView([lat, lng], 15);
-          L.marker([lat, lng]).addTo(map).bindPopup('現在地').openPopup();
-        });
       }
+    });
+
+    // Tag Management Modal
+    document.getElementById('btn-manage-tags').addEventListener('click', () => {
+      renderTagManageList();
+      tagManageModal.classList.remove('hidden');
+    });
+
+    document.getElementById('btn-close-tag-modal').addEventListener('click', () => tagManageModal.classList.add('hidden'));
+    document.getElementById('btn-close-tag-modal-bottom').addEventListener('click', () => tagManageModal.classList.add('hidden'));
+
+    function renderTagManageList() {
+      const tags = getAllTags();
+      if(tags.length === 0) {
+        tagManageList.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">登録されているタグはありません</p>`;
+        return;
+      }
+      tagManageList.innerHTML = tags.map(tag => `
+        <div class="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-lg p-2.5">
+          <span class="text-xs text-indigo-300 font-medium">#${escapeHtml(tag)}</span>
+          <div class="flex items-center gap-1.5">
+            <button onclick="renameTag('${escapeJs(tag)}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded transition">名称変更</button>
+            <button onclick="deleteTagGlobally('${escapeJs(tag)}')" class="px-2.5 py-1 bg-red-950/40 hover:bg-red-900/50 text-red-400 text-xs rounded transition">削除</button>
+          </div>
+        </div>
+      `).join('');
+      lucide.createIcons();
     }
 
-    function saveLocalStorage() {
+    window.renameTag = async (oldTag) => {
+      const newTag = prompt(`「${oldTag}」の新しいタグ名:`, oldTag);
+      if(!newTag || newTag.trim() === '' || newTag === oldTag) return;
+      const clean = newTag.trim();
       try {
-        // オープンDBは端末保存。個人DBはUID別キャッシュ＋Firestoreへ保存。
-        const openItems = localItems.filter(i => i && i.dbType === 'open');
-        localStorage.setItem('smart_item_db_open', JSON.stringify(openItems));
-        localStorage.setItem('smart_item_db', JSON.stringify(openItems));
+        const promises = items.filter(i => i.tags?.includes(oldTag)).map(i => updateDoc(doc(db, "items", i.id), { tags: i.tags.map(t => t === oldTag ? clean : t) }));
+        await Promise.all(promises);
+        if(selectedTags.has(oldTag)) { selectedTags.delete(oldTag); selectedTags.add(clean); }
+        renderTagManageList();
+      } catch(err) { alert("変更失敗: " + err.message); }
+    };
+
+    window.deleteTagGlobally = async (targetTag) => {
+      if(!confirm(`タグ「#${targetTag}」を削除しますか？`)) return;
+      try {
+        const promises = items.filter(i => i.tags?.includes(targetTag)).map(i => updateDoc(doc(db, "items", i.id), { tags: i.tags.filter(t => t !== targetTag) }));
+        await Promise.all(promises);
+        selectedTags.delete(targetTag);
+        renderTagManageList();
+      } catch(err) { alert("削除失敗: " + err.message); }
+    };
+
+    // Add/Edit Item Modal
+    document.getElementById('btn-add-item').addEventListener('click', () => {
+      itemIdInput.value = '';
+      itemForm.reset();
+      modalTitle.textContent = "新規キー追加";
+      renderExistingTagSuggestions();
+      itemModal.classList.remove('hidden');
+    });
+
+    const closeItemModal = () => itemModal.classList.add('hidden');
+    document.getElementById('btn-close-modal').addEventListener('click', closeItemModal);
+    document.getElementById('btn-cancel-modal').addEventListener('click', closeItemModal);
+
+    function renderExistingTagSuggestions() {
+      const tags = getAllTags();
+      existingTagsSuggestions.innerHTML = tags.length === 0 ? '' : 
+        `<span class="text-[10px] text-slate-500 w-full block mb-0.5">クリックして追加:</span>` + 
+        tags.map(t => `<button type="button" onclick="appendTagToInput('${escapeJs(t)}')" class="text-[10px] bg-slate-950 hover:bg-slate-800 text-indigo-300 border border-slate-800 px-2 py-0.5 rounded transition">#${escapeHtml(t)}</button>`).join('');
+    }
+
+    window.appendTagToInput = (tag) => {
+      const current = itemTagsInput.value.trim();
+      const arr = current ? current.split(',').map(s => s.trim()).filter(Boolean) : [];
+      if(!arr.includes(tag)) { arr.push(tag); itemTagsInput.value = arr.join(', '); }
+    };
+
+    itemForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if(!currentUser) return;
+
+      const id = itemIdInput.value;
+      const tagsArray = itemTagsInput.value.split(',').map(t => t.trim()).filter(Boolean);
+
+      const data = {
+        userId: currentUser.uid,
+        tags: tagsArray,
+        content: itemContentInput.value,
+        memo: itemMemoInput.value,
+        updatedAt: serverTimestamp()
+      };
+
+      btnSubmitItem.disabled = true;
+      btnSubmitItem.textContent = "保存中...";
+
+      try {
+        if(id) {
+          await updateDoc(doc(db, "items", id), data);
+        } else {
+          await addDoc(collection(db, "items"), data);
+        }
+        closeItemModal();
       } catch (err) {
-        console.error('端末データ保存失敗:', err);
-        alert('端末内データを保存できませんでした。ブラウザの保存容量や設定を確認してください。');
-        return false;
+        alert("保存失敗: " + err.message);
+      } finally {
+        btnSubmitItem.disabled = false;
+        btnSubmitItem.textContent = "保存";
       }
-      const personalItems = localItems.filter(i => i && i.dbType === 'personal');
-      if (personalItems.length && !currentUser) {
-        alert('個人DBの保存にはGoogleログインが必要です。データはクラウド保存されていません。ログイン後にもう一度操作してください。');
-        return false;
-      }
-      if (currentUser) {
-        // 通信失敗時にも再読込で復旧できるよう、先にUID別キャッシュへ退避。
-        try { localStorage.setItem('smart_item_db_' + currentUser.uid, JSON.stringify(personalItems)); } catch (_) {}
-        updateStorageStatus('クラウド保存中…', 'text-blue-600');
-        const saveUser = currentUser;
-        const itemsToSave = personalItems.map(item => ({ ...item }));
-        cloudSaveQueue = cloudSaveQueue.then(() => syncPersonalItemsToCloud(saveUser, itemsToSave)).catch(err => {
-          console.error('個人データのクラウド保存に失敗:', err);
-          updateStorageStatus('保存エラー', 'text-red-600');
-          alert('個人データをアカウントへ保存できませんでした。Firestoreのアクセスルールと通信状態を確認してください。\n' + err.message);
-        });
-      }
-      return true;
+    });
+
+    window.editItem = (id) => {
+      const item = items.find(i => i.id === id);
+      if(!item) return;
+      itemIdInput.value = item.id;
+      itemTagsInput.value = Array.isArray(item.tags) ? item.tags.join(', ') : '';
+      itemContentInput.value = item.content || '';
+      itemMemoInput.value = item.memo || '';
+      modalTitle.textContent = "キーを編集";
+      renderExistingTagSuggestions();
+      itemModal.classList.remove('hidden');
+    };
+
+    window.copyToClipboard = (text) => {
+      navigator.clipboard.writeText(text).then(() => {
+        const toast = document.getElementById('toast');
+        toast.classList.remove('opacity-0', 'pointer-events-none');
+        setTimeout(() => toast.classList.add('opacity-0', 'pointer-events-none'), 1800);
+      });
+    };
+
+    function escapeHtml(str) {
+      if(!str) return '';
+      return String(str).replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+      });
+    }
+    function escapeJs(str) {
+      if(!str) return '';
+      return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
     }
   </script>
 </body>
