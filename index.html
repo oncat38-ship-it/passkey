@@ -1,862 +1,699 @@
 <!DOCTYPE html>
-<html lang="ja" class="dark">
+<html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>9マス パターン＆確率予測アナライザー</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        darkbg: '#0f172a',
-                        cardbg: '#1e293b',
-                        accent: '#3b82f6',
-                        hot: '#ef4444',
-                        predict: '#10b981'
-                    }
-                }
-            }
-        }
-    </script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0b0f19;
-            color: #f8fafc;
-        }
-        .font-mono {
-            font-family: 'JetBrains Mono', monospace;
-        }
-        .grid-cell-glow {
-            box-shadow: 0 0 15px rgba(59, 130, 246, 0.15);
-        }
-        .grid-cell-glow-top {
-            box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
-            border-color: #10b981 !important;
-        }
-        /* 行・列の確率に応じた輝き効果 */
-        .glow-red {
-            border-color: #ef4444 !important;
-            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5), inset 0 0 12px rgba(239, 68, 68, 0.2);
-            background-color: rgba(239, 68, 68, 0.08) !important;
-        }
-        .glow-yellow {
-            border-color: #eab308 !important;
-            box-shadow: 0 0 18px rgba(234, 179, 8, 0.45), inset 0 0 10px rgba(234, 179, 8, 0.15);
-            background-color: rgba(234, 179, 8, 0.08) !important;
-        }
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0f172a;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 3px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevVault - Keys & Secrets Manager</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @media (max-width: 640px) {
+      input, select, textarea {
+        font-size: 16px !important;
+      }
+    }
+  </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between selection:bg-blue-500 selection:text-white">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
 
-    <!-- Header -->
-    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="p-2 bg-blue-600/20 text-blue-400 rounded-lg border border-blue-500/30">
-                    <i data-lucide="grid" class="w-6 h-6"></i>
-                </div>
-                <div>
-                    <h1 class="font-bold text-lg leading-tight tracking-wide bg-gradient-to-r from-blue-400 via-indigo-300 to-emerald-400 bg-clip-text text-transparent">
-                        9-Grid Pattern Predictor
-                    </h1>
-                    <p class="text-xs text-slate-400">リアルタイム出目パターン＆確率解析エンジン</p>
-                </div>
-            </div>
-            <div class="flex items-center space-x-2">
-                <button id="undo-btn" onclick="undoLastInput()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition flex items-center gap-1.5 active:scale-95 disabled:opacity-50">
-                    <i data-lucide="undo-2" class="w-4 h-4"></i>
-                    1手戻す
-                </button>
-                <button id="reset-btn" onclick="resetData()" class="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold rounded-lg border border-red-500/30 transition flex items-center gap-1.5 active:scale-95">
-                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-                    リセット
-                </button>
-            </div>
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50 flex items-center gap-2 text-xs">
+    <i data-lucide="check-circle" class="w-4 h-4"></i>
+    <span id="toast-message">クリップボードにコピーしました</span>
+  </div>
+
+  <!-- Loading Screen -->
+  <div id="loading" class="fixed inset-0 bg-slate-950 z-50 flex flex-col items-center justify-center gap-3">
+    <div class="animate-spin rounded-full h-10 w-10 border-2 border-indigo-500 border-t-transparent"></div>
+    <span class="text-xs text-slate-400">読み込み中...</span>
+  </div>
+
+  <!-- Auth View -->
+  <div id="auth-container" class="hidden flex-1 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-sm">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="p-2.5 bg-indigo-600/20 text-indigo-400 rounded-lg">
+          <i data-lucide="shield-check" class="w-6 h-6"></i>
         </div>
+        <div>
+          <h1 class="text-xl font-bold">DevVault</h1>
+          <p class="text-xs text-slate-400">キー・パスワード管理</p>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <!-- Google Login Button -->
+        <button id="btn-google-login" class="w-full bg-white hover:bg-slate-100 text-slate-800 font-medium py-2.5 px-4 rounded-lg transition text-xs flex items-center justify-center gap-2 shadow">
+          <svg class="w-4 h-4" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+          Googleでログイン
+        </button>
+
+        <div class="relative flex py-2 items-center">
+          <div class="flex-grow border-t border-slate-800"></div>
+          <span class="flex-shrink mx-4 text-slate-500 text-[10px] uppercase">またはID / メール</span>
+          <div class="flex-grow border-t border-slate-800"></div>
+        </div>
+
+        <form id="auth-form" class="space-y-3">
+          <div>
+            <input type="text" id="auth-email" placeholder="ID または メールアドレス"
+              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <input type="password" id="auth-password" placeholder="パスワード"
+              class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          </div>
+
+          <div id="auth-error" class="text-red-400 text-[11px] hidden"></div>
+
+          <div class="pt-1 flex gap-2">
+            <button type="submit" id="btn-login" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-lg transition text-xs">
+              ログイン
+            </button>
+            <button type="button" id="btn-signup" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2 rounded-lg transition text-xs">
+              新規登録
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main App View -->
+  <div id="app-container" class="hidden flex-1 flex flex-col">
+    <!-- Header (スッキリしたデザイン) -->
+    <header class="bg-slate-900/80 backdrop-blur border-b border-slate-800 sticky top-0 z-40 px-4 sm:px-6 py-2.5 flex justify-between items-center">
+      <div class="flex items-center gap-2.5">
+        <div class="p-1.5 bg-indigo-600/20 text-indigo-400 rounded-lg">
+          <i data-lucide="key-round" class="w-4 h-4"></i>
+        </div>
+        <span class="font-bold text-sm tracking-wide">DevVault</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="user-display" class="text-[11px] text-slate-300 font-medium bg-slate-950 px-3 py-1 rounded-md border border-slate-800 flex items-center gap-1.5">
+          <i data-lucide="user" class="w-3 h-3 text-indigo-400"></i>
+          <span id="user-name-text"></span>
+        </span>
+        <button id="btn-logout" class="text-xs text-slate-400 hover:text-white flex items-center gap-1 bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-md transition">
+          <i data-lucide="log-out" class="w-3 h-3"></i>
+          ログアウト
+        </button>
+      </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 py-6 flex-grow w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- Content Area -->
+    <main class="flex-1 max-w-5xl w-full mx-auto p-3 sm:p-6 space-y-4">
+      
+      <!-- Action Bar -->
+      <div class="flex flex-col sm:flex-row justify-between gap-3 items-center">
+        <div class="flex items-center gap-1.5 text-xs text-slate-400">
+          <i data-lucide="shield" class="w-4 h-4 text-indigo-400"></i>
+          <span>APIキー・パスワード・接続文字列管理</span>
+        </div>
 
-        <!-- Left Column: Keypad & Dynamic Probabilities Grid -->
-        <section class="lg:col-span-7 flex flex-col gap-4">
-            
-            <!-- Controls & Active Info Banner -->
-            <div class="bg-slate-900/90 rounded-xl p-4 border border-slate-800 flex items-center justify-between shadow-lg">
-                <div class="flex items-center gap-3">
-                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                        入力待ち
-                    </span>
-                    <span class="text-xs text-slate-400 hidden sm:inline">
-                        PCキーボード: <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-200">1~3</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-200">Q~E</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-200">A~D</kbd> | リセット: <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-200">0 / Space</kbd>
-                    </span>
-                </div>
-                <div class="text-xs text-right">
-                    <span class="text-slate-400">総試行回数:</span>
-                    <span id="total-count" class="font-mono font-bold text-lg text-emerald-400 ml-1">0</span>
-                </div>
-            </div>
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <div class="relative flex-1 sm:w-48">
+            <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500"></i>
+            <input type="text" id="search-input" placeholder="検索..." class="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          </div>
+          <button id="btn-manage-tags" class="bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0 border border-slate-700" title="タグ管理">
+            <i data-lucide="tags" class="w-3.5 h-3.5 text-indigo-400"></i>
+            タグ管理
+          </button>
+          <button id="btn-add-item" class="bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition shrink-0">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            追加
+          </button>
+        </div>
+      </div>
 
-            <!-- Main Interactive 3x3 Grid with Column/Row Summaries -->
-            <div class="bg-slate-900/60 rounded-2xl p-4 sm:p-6 border border-slate-800 shadow-xl relative">
-                
-                <div class="flex flex-col gap-3">
-                    
-                    <!-- Top Column Summaries -->
-                    <div class="grid grid-cols-3 gap-3 ml-0 mr-12 sm:mr-16">
-                        <!-- Col 1 -->
-                        <div class="bg-slate-800/60 border border-slate-700/60 rounded-lg p-2 text-center">
-                            <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">左列 (Col 1)</div>
-                            <div id="col-prob-0" class="text-base font-bold font-mono text-cyan-400">0.0%</div>
-                            <div class="w-full bg-slate-700 h-1 rounded-full mt-1 overflow-hidden">
-                                <div id="col-bar-0" class="bg-cyan-400 h-full w-0 transition-all duration-300"></div>
-                            </div>
-                        </div>
-                        <!-- Col 2 -->
-                        <div class="bg-slate-800/60 border border-slate-700/60 rounded-lg p-2 text-center">
-                            <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">中列 (Col 2)</div>
-                            <div id="col-prob-1" class="text-base font-bold font-mono text-cyan-400">0.0%</div>
-                            <div class="w-full bg-slate-700 h-1 rounded-full mt-1 overflow-hidden">
-                                <div id="col-bar-1" class="bg-cyan-400 h-full w-0 transition-all duration-300"></div>
-                            </div>
-                        </div>
-                        <!-- Col 3 -->
-                        <div class="bg-slate-800/60 border border-slate-700/60 rounded-lg p-2 text-center">
-                            <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">右列 (Col 3)</div>
-                            <div id="col-prob-2" class="text-base font-bold font-mono text-cyan-400">0.0%</div>
-                            <div class="w-full bg-slate-700 h-1 rounded-full mt-1 overflow-hidden">
-                                <div id="col-bar-2" class="bg-cyan-400 h-full w-0 transition-all duration-300"></div>
-                            </div>
-                        </div>
-                    </div>
+      <!-- Tag Filter Bar -->
+      <div id="tag-filter-container" class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+        <span class="text-[10px] text-slate-500 uppercase font-semibold shrink-0 mr-1">タグ絞り込み:</span>
+        <div id="tag-filters-list" class="flex items-center gap-1.5"></div>
+      </div>
 
-                    <!-- Row 1 + Row 1 Summary -->
-                    <div class="flex gap-3 items-center">
-                        <div class="grid grid-cols-3 gap-3 flex-grow">
-                            <!-- Cell 1 -->
-                            <button id="cell-1" onclick="handleInput('1')" class="grid-cell relative bg-slate-800/90 hover:bg-slate-750 active:scale-95 transition-all rounded-xl p-3 sm:p-4 border border-slate-700/80 flex flex-col justify-between h-24 sm:h-28 text-left group">
-                                <div class="flex justify-between items-start w-full">
-                                    <span class="font-mono font-extrabold text-lg sm:text-xl text-slate-200 group-hover:text-blue-400 transition">1</span>
-                                    <div class="flex items-center gap-1">
-                                        <span id="star-1" class="text-base sm:text-lg hidden"></span>
-                                        <span id="rank-1" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">TOP 1</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div class="flex justify-between items-baseline mb-1">
-                                        <span class="text-[10px] text-slate-400">出現: <span id="count-1" class="text-slate-200 font-mono">0</span></span>
-                                        <span id="prob-1" class="font-mono font-bold text-sm sm:text-base text-blue-400">0.0%</span>
-                                    </div>
-                                    <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                                        <div id="bar-1" class="bg-blue-500 h-full w-0 transition-all duration-300"></div>
-                                    </div>
-                                </div>
-                            </button>
-                            <!-- Cell 2 -->
-                            <button id="cell-2" onclick="handleInput('2')" class="grid-cell relative bg-slate-800/90 hover:bg-slate-750 active:scale-95 transition-all rounded-xl p-3 sm:p-4 border border-slate-700/80 flex flex-col justify-between h-24 sm:h-28 text-left group">
-                                <div class="flex justify-between items-start w-full">
-                                    <span class="font-mono font-extrabold text-lg sm:text-xl text-slate-200 group-hover:text-blue-400 transition">2</span>
-                                    <div class="flex items-center gap-1">
-                                        <span id="star-2" class="text-base sm:text-lg hidden"></span>
-                                        <span id="rank-2" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">TOP 1</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div class="flex justify-between items-baseline mb-1">
-                                        <span class="text-[10px] text-slate-400">出現: <span id="count-2" class="text-slate-200 font-mono">0</span></span>
-                                        <span id="prob-2" class="font-mono font-bold text-sm sm:text-base text-blue-400">0.0%</span>
-                                    </div>
-                                    <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                                        <div id="bar-2" class="bg-blue-500 h-full w-0 transition-all duration-300"></div>
-                                    </div>
-                                </div>
-                            </button>
-                            <!-- Cell 3 -->
-                            <button id="cell-3" onclick="handleInput('3')" class="grid-cell relative bg-slate-800/90 hover:bg-slate-750 active:scale-95 transition-all rounded-xl p-3 sm:p-4 border border-slate-700/80 flex flex-col justify-between h-24 sm:h-28 text-left group">
-                                <div class="flex justify-between items-start w-full">
-                                    <span class="font-mono font-extrabold text-lg sm:text-xl text-slate-200 group-hover:text-blue-400 transition">3</span>
-                                    <div class="flex items-center gap-1">
-                                        <span id="star-3" class="text-base sm:text-lg hidden"></span>
-                                        <span id="rank-3" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">TOP 1</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div class="flex justify-between items-baseline mb-1">
-                                        <span class="text-[10px] text-slate-400">出現: <span id="count-3" class="text-slate-200 font-mono">0</span></span>
-                                        <span id="prob-3" class="font-mono font-bold text-sm sm:text-base text-blue-400">0.0%</span>
-                                    </div>
-                                    <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                                        <div id="bar-3" class="bg-blue-500 h-full w-0 transition-all duration-300"></div>
-                                    </div>
-                                </div>
-                            </button>
-                        </div>
-
-                        <!-- Row 1 Summary Bar -->
-                        <div class="w-12 sm:w-16 h-24 sm:h-28 bg-slate-800/60 border border-slate-700/60 rounded-lg p-2 flex flex-col justify-between items-center text-center">
-                            <span class="text-[10px] text-slate-400 font-semibold">上段</span>
-                            <span id="row-prob-0" class="text-xs sm:text-sm font-bold font-mono text-purple-400">0.0%</span>
-                            <div class="w-2 bg-slate-700 h-12 rounded-full overflow-hidden flex flex-col justify-end">
-                                <div id="row-bar-0" class="bg-purple-400 w-full h-0 transition-all duration-300"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Row 2 + Row 2 Summary -->
-                    <div class="flex gap-3 items-center">
-                        <div class="grid grid-cols-3 gap-3 flex-grow">
-                            <!-- Cell Q -->
-                            <button id="cell-Q" onclick="handleInput('Q')" class="grid-cell relative bg-slate-800/90 hover:bg-slate-750 active:scale-95 transition-all rounded-xl p-3 sm:p-4 border border-slate-700/80 flex flex-col justify-between h-24 sm:h-28 text-left group">
-                                <div class="flex justify-between items-start w-full">
-                                    <span class="font-mono font-extrabold text-lg sm:text-xl text-slate-200 group-hover:text-blue-400 transition">Q</span>
-                                    <div class="flex items-center gap-1">
-                                        <span id="star-Q" class="text-base sm:text-lg hidden"></span>
-                                        <span id="rank-Q" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">TOP 1</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div class="flex justify-between items-baseline mb-1">
-                                        <span class="text-[10px] text-slate-400">出現: <span id="count-Q" class="text-slate-200 font-mono">0</span></span>
-                                        <span id="prob-Q" class="font-mono font-bold text-sm sm:text-base text-blue-400">0.0%</span>
-                                    </div>
-                                    <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                                        <div id="bar-Q" class="bg-blue-500 h-full w-0 transition-all duration-300"></div>
-                                    </div>
-                                </div>
-                            </button>
-                            <!-- Cell W -->
-                            <button id="cell-W" onclick="handleInput('W')" class="grid-cell relative bg-slate-800/90 hover:bg-slate-750 active:scale-95 transition-all rounded-xl p-3 sm:p-4 border border-slate-700/80 flex flex-col justify-between h-24 sm:h-28 text-left group">
-                                <div class="flex justify-between items-start w-full">
-                                    <span class="font-mono font-extrabold text-lg sm:text-xl text-slate-200 group-hover:text-blue-400 transition">W</span>
-                                    <div class="flex items-center gap-1">
-                                        <span id="star-W" class="text-base sm:text-lg hidden"></span>
-                                        <span id="rank-W" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">TOP 1</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div class="flex justify-between items-baseline mb-1">
-                                        <span class="text-[10px] text-slate-400">出現: <span id="count-W" class="text-slate-200 font-mono">0</span></span>
-                                        <span id="prob-W" class="font-mono font-bold text-sm sm:text-base text-blue-400">0.0%</span>
-                                    </div>
-                                    <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                                        <div id="bar-W" class="bg-blue-500 h-full w-0 transition-all duration-300"></div>
-                                    </div>
-                                </div>
-                            </button>
-                            <!-- Cell E -->
-                            <button id="cell-E" onclick="handleInput('E')" class="grid-cell relative bg-slate-800/90 hover:bg-slate-750 active:scale-95 transition-all rounded-xl p-3 sm:p-4 border border-slate-700/80 flex flex-col justify-between h-24 sm:h-28 text-left group">
-                                <div class="flex justify-between items-start w-full">
-                                    <span class="font-mono font-extrabold text-lg sm:text-xl text-slate-200 group-hover:text-blue-400 transition">E</span>
-                                    <div class="flex items-center gap-1">
-                                        <span id="star-E" class="text-base sm:text-lg hidden"></span>
-                                        <span id="rank-E" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">TOP 1</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div class="flex justify-between items-baseline mb-1">
-                                        <span class="text-[10px] text-slate-400">出現: <span id="count-E" class="text-slate-200 font-mono">0</span></span>
-                                        <span id="prob-E" class="font-mono font-bold text-sm sm:text-base text-blue-400">0.0%</span>
-                                    </div>
-                                    <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                                        <div id="bar-E" class="bg-blue-500 h-full w-0 transition-all duration-300"></div>
-                                    </div>
-                                </div>
-                            </button>
-                        </div>
-
-                        <!-- Row 2 Summary Bar -->
-                        <div class="w-12 sm:w-16 h-24 sm:h-28 bg-slate-800/60 border border-slate-700/60 rounded-lg p-2 flex flex-col justify-between items-center text-center">
-                            <span class="text-[10px] text-slate-400 font-semibold">中段</span>
-                            <span id="row-prob-1" class="text-xs sm:text-sm font-bold font-mono text-purple-400">0.0%</span>
-                            <div class="w-2 bg-slate-700 h-12 rounded-full overflow-hidden flex flex-col justify-end">
-                                <div id="row-bar-1" class="bg-purple-400 w-full h-0 transition-all duration-300"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Row 3 + Row 3 Summary -->
-                    <div class="flex gap-3 items-center">
-                        <div class="grid grid-cols-3 gap-3 flex-grow">
-                            <!-- Cell A -->
-                            <button id="cell-A" onclick="handleInput('A')" class="grid-cell relative bg-slate-800/90 hover:bg-slate-750 active:scale-95 transition-all rounded-xl p-3 sm:p-4 border border-slate-700/80 flex flex-col justify-between h-24 sm:h-28 text-left group">
-                                <div class="flex justify-between items-start w-full">
-                                    <span class="font-mono font-extrabold text-lg sm:text-xl text-slate-200 group-hover:text-blue-400 transition">A</span>
-                                    <div class="flex items-center gap-1">
-                                        <span id="star-A" class="text-base sm:text-lg hidden"></span>
-                                        <span id="rank-A" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">TOP 1</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div class="flex justify-between items-baseline mb-1">
-                                        <span class="text-[10px] text-slate-400">出現: <span id="count-A" class="text-slate-200 font-mono">0</span></span>
-                                        <span id="prob-A" class="font-mono font-bold text-sm sm:text-base text-blue-400">0.0%</span>
-                                    </div>
-                                    <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                                        <div id="bar-A" class="bg-blue-500 h-full w-0 transition-all duration-300"></div>
-                                    </div>
-                                </div>
-                            </button>
-                            <!-- Cell S -->
-                            <button id="cell-S" onclick="handleInput('S')" class="grid-cell relative bg-slate-800/90 hover:bg-slate-750 active:scale-95 transition-all rounded-xl p-3 sm:p-4 border border-slate-700/80 flex flex-col justify-between h-24 sm:h-28 text-left group">
-                                <div class="flex justify-between items-start w-full">
-                                    <span class="font-mono font-extrabold text-lg sm:text-xl text-slate-200 group-hover:text-blue-400 transition">S</span>
-                                    <div class="flex items-center gap-1">
-                                        <span id="star-S" class="text-base sm:text-lg hidden"></span>
-                                        <span id="rank-S" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">TOP 1</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div class="flex justify-between items-baseline mb-1">
-                                        <span class="text-[10px] text-slate-400">出現: <span id="count-S" class="text-slate-200 font-mono">0</span></span>
-                                        <span id="prob-S" class="font-mono font-bold text-sm sm:text-base text-blue-400">0.0%</span>
-                                    </div>
-                                    <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                                        <div id="bar-S" class="bg-blue-500 h-full w-0 transition-all duration-300"></div>
-                                    </div>
-                                </div>
-                            </button>
-                            <!-- Cell D -->
-                            <button id="cell-D" onclick="handleInput('D')" class="grid-cell relative bg-slate-800/90 hover:bg-slate-750 active:scale-95 transition-all rounded-xl p-3 sm:p-4 border border-slate-700/80 flex flex-col justify-between h-24 sm:h-28 text-left group">
-                                <div class="flex justify-between items-start w-full">
-                                    <span class="font-mono font-extrabold text-lg sm:text-xl text-slate-200 group-hover:text-blue-400 transition">D</span>
-                                    <div class="flex items-center gap-1">
-                                        <span id="star-D" class="text-base sm:text-lg hidden"></span>
-                                        <span id="rank-D" class="hidden text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">TOP 1</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div class="flex justify-between items-baseline mb-1">
-                                        <span class="text-[10px] text-slate-400">出現: <span id="count-D" class="text-slate-200 font-mono">0</span></span>
-                                        <span id="prob-D" class="font-mono font-bold text-sm sm:text-base text-blue-400">0.0%</span>
-                                    </div>
-                                    <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                                        <div id="bar-D" class="bg-blue-500 h-full w-0 transition-all duration-300"></div>
-                                    </div>
-                                </div>
-                            </button>
-                        </div>
-
-                        <!-- Row 3 Summary Bar -->
-                        <div class="w-12 sm:w-16 h-24 sm:h-28 bg-slate-800/60 border border-slate-700/60 rounded-lg p-2 flex flex-col justify-between items-center text-center">
-                            <span class="text-[10px] text-slate-400 font-semibold">下段</span>
-                            <span id="row-prob-2" class="text-xs sm:text-sm font-bold font-mono text-purple-400">0.0%</span>
-                            <div class="w-2 bg-slate-700 h-12 rounded-full overflow-hidden flex flex-col justify-end">
-                                <div id="row-bar-2" class="bg-purple-400 w-full h-0 transition-all duration-300"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-
-            </div>
-
-            <!-- Wildcard / Reset Action Bar -->
-            <div class="grid grid-cols-2 gap-3">
-                <button onclick="handleInput('0')" class="py-3 px-4 bg-slate-800/80 hover:bg-slate-750 active:scale-95 border border-slate-700/70 rounded-xl text-slate-300 text-xs font-semibold flex items-center justify-center gap-2 transition shadow-md">
-                    <span class="px-2 py-0.5 bg-slate-700 rounded font-mono text-white text-xs">0 / Space</span>
-                    <span>スキップ / ワイルドカード</span>
-                </button>
-                <div class="py-3 px-4 bg-slate-900/60 border border-slate-800 rounded-xl text-xs flex items-center justify-between text-slate-400">
-                    <span>予測モード:</span>
-                    <span class="text-emerald-400 font-medium flex items-center gap-1">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        マルコフ連鎖 + 頻度分析
-                    </span>
-                </div>
-            </div>
-
-        </section>
-
-        <!-- Right Column: Predictions Summary & Analytics -->
-        <section class="lg:col-span-5 flex flex-col gap-4">
-            
-            <!-- Key Predictions Highlight Card -->
-            <div class="bg-slate-900/90 rounded-xl p-5 border border-slate-800 shadow-lg flex flex-col gap-4">
-                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="sparkles" class="w-5 h-5 text-emerald-400"></i>
-                        <h2 class="font-bold text-sm text-slate-200">次手 最有力予測</h2>
-                    </div>
-                    <span class="text-[11px] text-slate-400">総合パターン確率</span>
-                </div>
-
-                <div class="grid grid-cols-3 gap-3">
-                    <!-- Top Cell Prediction -->
-                    <div class="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 flex flex-col items-center justify-center text-center">
-                        <span class="text-[10px] text-slate-400 mb-1">本命マス</span>
-                        <div id="top-cell-key" class="text-2xl font-black font-mono text-emerald-400">-</div>
-                        <span id="top-cell-prob" class="text-xs font-mono font-bold text-slate-300 mt-1">0.0%</span>
-                    </div>
-                    <!-- Top Row Prediction -->
-                    <div class="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 flex flex-col items-center justify-center text-center">
-                        <span class="text-[10px] text-slate-400 mb-1">本命 行</span>
-                        <div id="top-row-key" class="text-lg font-bold text-purple-400">-</div>
-                        <span id="top-row-prob" class="text-xs font-mono font-bold text-slate-300 mt-1">0.0%</span>
-                    </div>
-                    <!-- Top Col Prediction -->
-                    <div class="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 flex flex-col items-center justify-center text-center">
-                        <span class="text-[10px] text-slate-400 mb-1">本命 列</span>
-                        <div id="top-col-key" class="text-lg font-bold text-cyan-400">-</div>
-                        <span id="top-col-prob" class="text-xs font-mono font-bold text-slate-300 mt-1">0.0%</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Pattern History Log -->
-            <div class="bg-slate-900/90 rounded-xl p-5 border border-slate-800 shadow-lg flex-grow flex flex-col justify-between">
-                <div>
-                    <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
-                        <div class="flex items-center gap-2">
-                            <i data-lucide="history" class="w-5 h-5 text-blue-400"></i>
-                            <h2 class="font-bold text-sm text-slate-200">入力パターン履歴</h2>
-                        </div>
-                        <span id="history-count" class="text-xs font-mono text-slate-400">直近 0 件</span>
-                    </div>
-
-                    <!-- Scrollable Log Chips -->
-                    <div id="history-container" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1 min-h-[60px] items-center">
-                        <span class="text-xs text-slate-500 italic">履歴がありません。マスまたはキーを押してください。</span>
-                    </div>
-                </div>
-
-                <!-- Frequency Stats Summary Table -->
-                <div class="mt-4 pt-3 border-t border-slate-800">
-                    <h3 class="text-xs font-semibold text-slate-400 mb-2 flex items-center justify-between">
-                        <span>ランキング / 単純統計</span>
-                        <span class="text-[10px] text-slate-500">出現度一覧</span>
-                    </h3>
-                    <div id="ranking-list" class="grid grid-cols-3 gap-2">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-
-            </div>
-
-        </section>
+      <!-- Item List Section -->
+      <section class="space-y-1.5">
+        <div id="items-list" class="space-y-1.5"></div>
+      </section>
 
     </main>
+  </div>
 
-    <!-- Footer -->
-    <footer class="border-t border-slate-800 bg-slate-900/40 py-3 text-center text-xs text-slate-500">
-        9-Grid Prediction Engine &copy; 2026 | Built for GitHub Pages & Vercel
-    </footer>
+  <!-- Detail Modal -->
+  <div id="detail-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+      <div class="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+        <div id="detail-tags-header" class="flex flex-wrap gap-1 min-w-0"></div>
+        <button id="btn-close-detail" class="text-slate-400 hover:text-white p-1 shrink-0">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="p-4 space-y-3 overflow-y-auto flex-1">
+        <div id="detail-memo-container" class="hidden">
+          <span class="text-[10px] text-slate-500 uppercase font-semibold">備考欄</span>
+          <p id="detail-memo" class="text-xs text-slate-300 mt-0.5 whitespace-pre-wrap"></p>
+        </div>
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-[10px] text-slate-500 uppercase font-semibold">値 / キー</span>
+            <div class="flex items-center gap-2">
+              <button id="detail-btn-toggle-mask" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded flex items-center gap-1 transition">
+                <i data-lucide="eye" class="w-3 h-3"></i> 表示/隠す
+              </button>
+              <button id="detail-btn-copy" class="text-[11px] bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 px-2 py-1 rounded flex items-center gap-1 transition">
+                <i data-lucide="copy" class="w-3 h-3"></i> コピー
+              </button>
+            </div>
+          </div>
+          <pre id="detail-content-pre" class="bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono overflow-x-auto text-slate-200 whitespace-pre-wrap select-none blur-sm transition-all duration-200"><code><span id="detail-code-block"></span></code></pre>
+        </div>
+      </div>
+      <div class="px-4 py-2.5 border-t border-slate-800 flex justify-end gap-2 bg-slate-900/50">
+        <button id="detail-btn-edit" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium transition flex items-center gap-1">
+          <i data-lucide="pencil" class="w-3 h-3"></i> 編集
+        </button>
+        <button id="detail-btn-delete" class="px-3 py-1.5 bg-red-950/40 hover:bg-red-900/50 text-red-400 rounded-lg text-xs font-medium transition flex items-center gap-1">
+          <i data-lucide="trash-2" class="w-3 h-3"></i> 削除
+        </button>
+      </div>
+    </div>
+  </div>
 
-    <!-- Application JavaScript Logic -->
-    <script>
-        // Key mapping and Grid Definitions
-        const GRID_KEYS = ['1', '2', '3', 'Q', 'W', 'E', 'A', 'S', 'D'];
-        const KEY_POSITIONS = {
-            '1': { row: 0, col: 0 }, '2': { row: 0, col: 1 }, '3': { row: 0, col: 2 },
-            'Q': { row: 1, col: 0 }, 'W': { row: 1, col: 1 }, 'E': { row: 1, col: 2 },
-            'A': { row: 2, col: 0 }, 'S': { row: 2, col: 1 }, 'D': { row: 2, col: 2 }
-        };
+  <!-- Tag Management Modal -->
+  <div id="tag-manage-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div class="px-4 py-3 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+        <h3 class="font-bold text-sm text-slate-100 flex items-center gap-1.5">
+          <i data-lucide="tags" class="w-4 h-4 text-indigo-400"></i> タグ一覧と編集
+        </h3>
+        <button id="btn-close-tag-modal" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+        <div id="tag-manage-list" class="space-y-2"></div>
+      </div>
+      <div class="px-4 py-2.5 border-t border-slate-800 flex justify-end bg-slate-900/50">
+        <button id="btn-close-tag-modal-bottom" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition">閉じる</button>
+      </div>
+    </div>
+  </div>
 
-        const ROW_NAMES = ['上段 (1-3)', '中段 (Q-E)', '下段 (A-D)'];
-        const COL_NAMES = ['左列 (1,Q,A)', '中列 (2,W,S)', '右列 (3,E,D)'];
+  <!-- Add/Edit Item Modal -->
+  <div id="item-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div class="px-4 py-3 border-b border-slate-800 flex justify-between items-center">
+        <h3 id="modal-title" class="font-bold text-sm text-slate-100">新規キー追加</h3>
+        <button id="btn-close-modal" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <form id="item-form" class="p-4 space-y-3">
+        <input type="hidden" id="item-id">
+        
+        <div>
+          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">タグ (カンマ区切り)</label>
+          <input type="text" id="item-tags" required placeholder="例: vercel, secret, api" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+          <div id="existing-tags-suggestions" class="flex flex-wrap gap-1 mt-1.5"></div>
+        </div>
 
-        // State Storage
-        let history = []; // Array of inputs ('1','2',...,'0')
-        let counts = {};
-        GRID_KEYS.forEach(k => counts[k] = 0);
+        <div>
+          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">キー / パスワード / 値</label>
+          <textarea id="item-content" required rows="3" placeholder="APIキーや秘密の文字列を貼り付け" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500"></textarea>
+        </div>
 
-        // Transition Tables for Markov Chain Prediction
-        // 1-step transitions: markov1[prev][next]
-        let markov1 = {};
-        // 2-step transitions: markov2[prev2_prev1][next]
-        let markov2 = {};
+        <div>
+          <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">備考欄 (任意)</label>
+          <input type="text" id="item-memo" placeholder="用途など（例: 本番用Vercelトークン）" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-sm sm:text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+        </div>
 
-        // Color mapping based on probability
-        function getProbColorClass(prob) {
-            if (prob >= 25) return 'text-emerald-400';
-            if (prob >= 15) return 'text-blue-400';
-            if (prob >= 8) return 'text-indigo-300';
-            return 'text-slate-400';
-        }
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <button type="button" id="btn-cancel-modal" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition">キャンセル</button>
+          <button type="submit" id="btn-submit-item" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-        // Initialize icons on load
-        window.onload = function() {
-            lucide.createIcons();
-            updateUI();
-        };
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+      getAuth, 
+      signInWithEmailAndPassword, 
+      createUserWithEmailAndPassword, 
+      signInWithPopup,
+      GoogleAuthProvider,
+      signOut, 
+      onAuthStateChanged 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { 
+      getFirestore, 
+      collection, 
+      addDoc, 
+      updateDoc, 
+      deleteDoc, 
+      doc, 
+      query, 
+      where, 
+      onSnapshot, 
+      serverTimestamp 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // Keyboard Event Listener
-        window.addEventListener('keydown', (e) => {
-            const key = e.key.toUpperCase();
-            if (GRID_KEYS.includes(key)) {
-                e.preventDefault();
-                handleInput(key);
-            } else if (key === '0' || e.code === 'Space') {
-                e.preventDefault();
-                handleInput('0');
-            } else if (e.key === 'Backspace' || (e.ctrlKey && key === 'Z')) {
-                e.preventDefault();
-                undoLastInput();
-            }
+    const firebaseConfig = {
+      apiKey: "AIzaSyAoNZm6KwPQuWbC0W65sOh4soLMx1UoUrQ",
+      authDomain: "g-account-6f48b.firebaseapp.com",
+      projectId: "g-account-6f48b",
+      storageBucket: "g-account-6f48b.firebasestorage.app",
+      messagingSenderId: "719634797870",
+      appId: "1:719634797870:web:5e6c3affbed118aa8d16bf",
+      measurementId: "G-0WB2ZMX6K1"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const googleProvider = new GoogleAuthProvider();
+
+    let currentUser = null;
+    let items = [];
+    let searchQuery = '';
+    let selectedTags = new Set();
+    let activeDetailItem = null;
+    let isMasked = true;
+
+    // DOM
+    const loading = document.getElementById('loading');
+    const authContainer = document.getElementById('auth-container');
+    const appContainer = document.getElementById('app-container');
+    const authForm = document.getElementById('auth-form');
+    const authEmail = document.getElementById('auth-email');
+    const authPassword = document.getElementById('auth-password');
+    const authError = document.getElementById('auth-error');
+    const userNameText = document.getElementById('user-name-text');
+    const btnLogout = document.getElementById('btn-logout');
+    const btnGoogleLogin = document.getElementById('btn-google-login');
+
+    const itemsList = document.getElementById('items-list');
+    const searchInput = document.getElementById('search-input');
+    const tagFiltersList = document.getElementById('tag-filters-list');
+
+    const itemModal = document.getElementById('item-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const itemForm = document.getElementById('item-form');
+    const itemIdInput = document.getElementById('item-id');
+    const itemTagsInput = document.getElementById('item-tags');
+    const itemContentInput = document.getElementById('item-content');
+    const itemMemoInput = document.getElementById('item-memo');
+    const existingTagsSuggestions = document.getElementById('existing-tags-suggestions');
+    const btnSubmitItem = document.getElementById('btn-submit-item');
+
+    const detailModal = document.getElementById('detail-modal');
+    const detailTagsHeader = document.getElementById('detail-tags-header');
+    const detailMemoContainer = document.getElementById('detail-memo-container');
+    const detailMemo = document.getElementById('detail-memo');
+    const detailCodeBlock = document.getElementById('detail-code-block');
+    const detailBtnCopy = document.getElementById('detail-btn-copy');
+    const detailBtnToggleMask = document.getElementById('detail-btn-toggle-mask');
+    const detailBtnEdit = document.getElementById('detail-btn-edit');
+    const detailBtnDelete = document.getElementById('detail-btn-delete');
+
+    const tagManageModal = document.getElementById('tag-manage-modal');
+    const tagManageList = document.getElementById('tag-manage-list');
+
+    function formatAuthInput(val) {
+      if (!val.includes('@')) {
+        return `${val.trim()}@devvault.local`;
+      }
+      return val.trim();
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      loading.classList.add('hidden');
+      if (user) {
+        currentUser = user;
+        userNameText.textContent = user.displayName || user.email.replace('@devvault.local', '');
+        authContainer.classList.add('hidden');
+        appContainer.classList.remove('hidden');
+        subscribeItems();
+      } else {
+        currentUser = null;
+        authContainer.classList.remove('hidden');
+        appContainer.classList.add('hidden');
+      }
+      lucide.createIcons();
+    });
+
+    btnGoogleLogin.addEventListener('click', async () => {
+      authError.classList.add('hidden');
+      try {
+        await signInWithPopup(auth, googleProvider);
+      } catch (err) {
+        authError.textContent = "Googleログインエラー: " + err.message;
+        authError.classList.remove('hidden');
+      }
+    });
+
+    authForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      authError.classList.add('hidden');
+      try {
+        await signInWithEmailAndPassword(auth, formatAuthInput(authEmail.value), authPassword.value);
+      } catch (err) {
+        authError.textContent = "ログインエラー: IDまたはパスワードが正しくありません";
+        authError.classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('btn-signup').addEventListener('click', async () => {
+      authError.classList.add('hidden');
+      if(!authEmail.value || !authPassword.value) {
+        authError.textContent = "IDとパスワードを入力してください";
+        authError.classList.remove('hidden');
+        return;
+      }
+      try {
+        await createUserWithEmailAndPassword(auth, formatAuthInput(authEmail.value), authPassword.value);
+      } catch (err) {
+        authError.textContent = "登録エラー: " + err.message;
+        authError.classList.remove('hidden');
+      }
+    });
+
+    btnLogout.addEventListener('click', () => signOut(auth));
+
+    function subscribeItems() {
+      if (!currentUser) return;
+      const loadTimer = setTimeout(() => loading.classList.add('hidden'), 4000);
+
+      onSnapshot(query(collection(db, "items"), where("userId", "==", currentUser.uid)), (snapshot) => {
+        clearTimeout(loadTimer);
+        loading.classList.add('hidden');
+        items = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          let tags = Array.isArray(data.tags) ? data.tags : (typeof data.tags === 'string' ? data.tags.split(',').map(t => t.trim()).filter(Boolean) : []);
+          items.push({ id: doc.id, ...data, tags, content: data.content || '' });
         });
+        renderTagFilters();
+        renderItems();
+      }, (error) => {
+        clearTimeout(loadTimer);
+        loading.classList.add('hidden');
+        console.error("Firestore Error:", error);
+      });
+    }
 
-        // Core Input Handler
-        function handleInput(key) {
-            history.push(key);
-            if (key !== '0' && counts[key] !== undefined) {
-                counts[key]++;
-            }
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value.toLowerCase();
+      renderItems();
+    });
 
-            // Visual Keypress Effect
-            if (key !== '0') {
-                const btn = document.getElementById(`cell-${key}`);
-                if (btn) {
-                    btn.classList.add('scale-95', 'bg-blue-600/30');
-                    setTimeout(() => {
-                        btn.classList.remove('scale-95', 'bg-blue-600/30');
-                    }, 120);
-                }
-            }
+    function getAllTags() {
+      const allTags = new Set();
+      items.forEach(item => item.tags?.forEach(t => allTags.add(t)));
+      return Array.from(allTags);
+    }
 
-            calculateAndRender();
+    function renderTagFilters() {
+      const tags = getAllTags();
+      const allSelected = selectedTags.size === 0;
+
+      let html = `<button onclick="toggleTagFilter('ALL')" class="px-2 py-1 rounded text-[11px] font-medium transition ${allSelected ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'}">すべて</button>`;
+      
+      tags.forEach(tag => {
+        const isSelected = selectedTags.has(tag);
+        html += `<button onclick="toggleTagFilter('${escapeJs(tag)}')" class="px-2 py-1 rounded text-[11px] font-medium transition ${isSelected ? 'bg-indigo-600 text-white shadow' : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'}">#${escapeHtml(tag)}</button>`;
+      });
+
+      tagFiltersList.innerHTML = html;
+    }
+
+    window.toggleTagFilter = (tag) => {
+      if (tag === 'ALL') {
+        selectedTags.clear();
+      } else {
+        selectedTags.has(tag) ? selectedTags.delete(tag) : selectedTags.add(tag);
+      }
+      renderTagFilters();
+      renderItems();
+    };
+
+    function renderItems() {
+      const filtered = items.filter(item => {
+        const matchesSearch = item.content.toLowerCase().includes(searchQuery) || 
+                              (item.memo && item.memo.toLowerCase().includes(searchQuery)) ||
+                              (item.tags && item.tags.some(t => t.toLowerCase().includes(searchQuery)));
+        
+        let matchesTags = selectedTags.size === 0 || Array.from(selectedTags).every(t => item.tags?.includes(t));
+        return matchesSearch && matchesTags;
+      });
+
+      if(filtered.length === 0) {
+        itemsList.innerHTML = `<div class="py-12 text-center text-slate-600 text-xs">データがありません</div>`;
+        return;
+      }
+
+      itemsList.innerHTML = filtered.map(item => {
+        const maskedContent = isMasked ? '••••••••••••••••' : item.content;
+        return `
+          <div onclick="openDetail('${item.id}')" class="bg-slate-900 hover:bg-slate-800/80 border border-slate-800 rounded-lg px-3 py-2.5 flex items-center justify-between cursor-pointer transition group">
+            <div class="flex items-center gap-2.5 min-w-0 flex-1 mr-3">
+              <div class="flex items-center gap-1 shrink-0">
+                ${(item.tags || []).map(t => `<span class="text-[10px] bg-indigo-950/80 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800/50 font-medium">#${escapeHtml(t)}</span>`).join('')}
+              </div>
+              <span class="text-xs font-mono text-slate-400 truncate ml-1">${escapeHtml(maskedContent)}</span>
+              ${item.memo ? `<span class="text-[11px] text-slate-500 truncate hidden md:inline ml-2">(${escapeHtml(item.memo)})</span>` : ''}
+            </div>
+            <div class="flex items-center gap-1 shrink-0" onclick="event.stopPropagation()">
+              <button onclick="toggleMaskGlobal(event)" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded transition" title="表示/隠す切替">
+                <i data-lucide="${isMasked ? 'eye' : 'eye-off'}" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="copyToClipboard('${escapeJs(item.content)}')" class="p-1.5 bg-slate-800 hover:bg-indigo-600/30 text-slate-400 hover:text-indigo-300 rounded transition" title="コピー">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="openDetail('${item.id}')" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded transition" title="詳細">
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    window.toggleMaskGlobal = (e) => {
+      e.stopPropagation();
+      isMasked = !isMasked;
+      renderItems();
+    };
+
+    window.openDetail = (id) => {
+      const item = items.find(i => i.id === id);
+      if(!item) return;
+      activeDetailItem = item;
+      
+      detailTagsHeader.innerHTML = (item.tags || []).map(t => `<span class="text-[11px] bg-indigo-950 border border-indigo-800/60 text-indigo-300 px-2.5 py-0.5 rounded font-medium">#${escapeHtml(t)}</span>`).join('');
+
+      if(item.memo) {
+        detailMemo.textContent = item.memo;
+        detailMemoContainer.classList.remove('hidden');
+      } else {
+        detailMemoContainer.classList.add('hidden');
+      }
+
+      detailCodeBlock.textContent = item.content || '';
+      
+      const pre = document.getElementById('detail-content-pre');
+      pre.classList.add('select-none', 'blur-sm');
+      detailBtnToggleMask.innerHTML = `<i data-lucide="eye" class="w-3 h-3"></i> 表示/隠す`;
+
+      detailModal.classList.remove('hidden');
+      lucide.createIcons();
+    };
+
+    document.getElementById('btn-close-detail').addEventListener('click', () => detailModal.classList.add('hidden'));
+
+    detailBtnCopy.addEventListener('click', () => {
+      if(activeDetailItem) copyToClipboard(activeDetailItem.content);
+    });
+
+    detailBtnToggleMask.addEventListener('click', () => {
+      const pre = document.getElementById('detail-content-pre');
+      if(pre.classList.contains('select-none')) {
+        pre.classList.remove('select-none', 'blur-sm');
+        detailBtnToggleMask.innerHTML = `<i data-lucide="eye-off" class="w-3 h-3"></i> 隠す`;
+      } else {
+        pre.classList.add('select-none', 'blur-sm');
+        detailBtnToggleMask.innerHTML = `<i data-lucide="eye" class="w-3 h-3"></i> 表示`;
+      }
+      lucide.createIcons();
+    });
+
+    detailBtnEdit.addEventListener('click', () => {
+      detailModal.classList.add('hidden');
+      editItem(activeDetailItem.id);
+    });
+
+    detailBtnDelete.addEventListener('click', async () => {
+      if(activeDetailItem && confirm("この項目を削除しますか？")) {
+        try {
+          await deleteDoc(doc(db, "items", activeDetailItem.id));
+          detailModal.classList.add('hidden');
+        } catch(err) {
+          alert("削除失敗: " + err.message);
         }
+      }
+    });
 
-        // Undo Last Input
-        function undoLastInput() {
-            if (history.length === 0) return;
-            const removedKey = history.pop();
-            if (removedKey !== '0' && counts[removedKey] > 0) {
-                counts[removedKey]--;
-            }
-            calculateAndRender();
+    // Tag Management Modal
+    document.getElementById('btn-manage-tags').addEventListener('click', () => {
+      renderTagManageList();
+      tagManageModal.classList.remove('hidden');
+    });
+
+    document.getElementById('btn-close-tag-modal').addEventListener('click', () => tagManageModal.classList.add('hidden'));
+    document.getElementById('btn-close-tag-modal-bottom').addEventListener('click', () => tagManageModal.classList.add('hidden'));
+
+    function renderTagManageList() {
+      const tags = getAllTags();
+      if(tags.length === 0) {
+        tagManageList.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">登録されているタグはありません</p>`;
+        return;
+      }
+      tagManageList.innerHTML = tags.map(tag => `
+        <div class="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-lg p-2.5">
+          <span class="text-xs text-indigo-300 font-medium">#${escapeHtml(tag)}</span>
+          <div class="flex items-center gap-1.5">
+            <button onclick="renameTag('${escapeJs(tag)}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded transition">名称変更</button>
+            <button onclick="deleteTagGlobally('${escapeJs(tag)}')" class="px-2.5 py-1 bg-red-950/40 hover:bg-red-900/50 text-red-400 text-xs rounded transition">削除</button>
+          </div>
+        </div>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    window.renameTag = async (oldTag) => {
+      const newTag = prompt(`「${oldTag}」の新しいタグ名:`, oldTag);
+      if(!newTag || newTag.trim() === '' || newTag === oldTag) return;
+      const clean = newTag.trim();
+      try {
+        const promises = items.filter(i => i.tags?.includes(oldTag)).map(i => updateDoc(doc(db, "items", i.id), { tags: i.tags.map(t => t === oldTag ? clean : t) }));
+        await Promise.all(promises);
+        if(selectedTags.has(oldTag)) { selectedTags.delete(oldTag); selectedTags.add(clean); }
+        renderTagManageList();
+      } catch(err) { alert("変更失敗: " + err.message); }
+    };
+
+    window.deleteTagGlobally = async (targetTag) => {
+      if(!confirm(`タグ「#${targetTag}」を削除しますか？`)) return;
+      try {
+        const promises = items.filter(i => i.tags?.includes(targetTag)).map(i => updateDoc(doc(db, "items", i.id), { tags: i.tags.filter(t => t !== targetTag) }));
+        await Promise.all(promises);
+        selectedTags.delete(targetTag);
+        renderTagManageList();
+      } catch(err) { alert("削除失敗: " + err.message); }
+    };
+
+    // Add/Edit Item Modal
+    document.getElementById('btn-add-item').addEventListener('click', () => {
+      itemIdInput.value = '';
+      itemForm.reset();
+      modalTitle.textContent = "新規キー追加";
+      renderExistingTagSuggestions();
+      itemModal.classList.remove('hidden');
+    });
+
+    const closeItemModal = () => itemModal.classList.add('hidden');
+    document.getElementById('btn-close-modal').addEventListener('click', closeItemModal);
+    document.getElementById('btn-cancel-modal').addEventListener('click', closeItemModal);
+
+    function renderExistingTagSuggestions() {
+      const tags = getAllTags();
+      existingTagsSuggestions.innerHTML = tags.length === 0 ? '' : 
+        `<span class="text-[10px] text-slate-500 w-full block mb-0.5">クリックして追加:</span>` + 
+        tags.map(t => `<button type="button" onclick="appendTagToInput('${escapeJs(t)}')" class="text-[10px] bg-slate-950 hover:bg-slate-800 text-indigo-300 border border-slate-800 px-2 py-0.5 rounded transition">#${escapeHtml(t)}</button>`).join('');
+    }
+
+    window.appendTagToInput = (tag) => {
+      const current = itemTagsInput.value.trim();
+      const arr = current ? current.split(',').map(s => s.trim()).filter(Boolean) : [];
+      if(!arr.includes(tag)) { arr.push(tag); itemTagsInput.value = arr.join(', '); }
+    };
+
+    itemForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if(!currentUser) return;
+
+      const id = itemIdInput.value;
+      const tagsArray = itemTagsInput.value.split(',').map(t => t.trim()).filter(Boolean);
+
+      const data = {
+        userId: currentUser.uid,
+        tags: tagsArray,
+        content: itemContentInput.value,
+        memo: itemMemoInput.value,
+        updatedAt: serverTimestamp()
+      };
+
+      btnSubmitItem.disabled = true;
+      btnSubmitItem.textContent = "保存中...";
+
+      try {
+        if(id) {
+          await updateDoc(doc(db, "items", id), data);
+        } else {
+          await addDoc(collection(db, "items"), data);
         }
+        closeItemModal();
+      } catch (err) {
+        alert("保存失敗: " + err.message);
+      } finally {
+        btnSubmitItem.disabled = false;
+        btnSubmitItem.textContent = "保存";
+      }
+    });
 
-        // Reset Data
-        function resetData() {
-            history = [];
-            GRID_KEYS.forEach(k => counts[k] = 0);
-            calculateAndRender();
-        }
+    window.editItem = (id) => {
+      const item = items.find(i => i.id === id);
+      if(!item) return;
+      itemIdInput.value = item.id;
+      itemTagsInput.value = Array.isArray(item.tags) ? item.tags.join(', ') : '';
+      itemContentInput.value = item.content || '';
+      itemMemoInput.value = item.memo || '';
+      modalTitle.textContent = "キーを編集";
+      renderExistingTagSuggestions();
+      itemModal.classList.remove('hidden');
+    };
 
-        // Calculate Markov Chains and Predict Probabilities
-        function calculateAndRender() {
-            // Rebuild Markov tables from history
-            markov1 = {};
-            markov2 = {};
+    window.copyToClipboard = (text) => {
+      navigator.clipboard.writeText(text).then(() => {
+        const toast = document.getElementById('toast');
+        toast.classList.remove('opacity-0', 'pointer-events-none');
+        setTimeout(() => toast.classList.add('opacity-0', 'pointer-events-none'), 1800);
+      });
+    };
 
-            for (let i = 0; i < history.length - 1; i++) {
-                const curr = history[i];
-                const next = history[i + 1];
-
-                if (!markov1[curr]) markov1[curr] = {};
-                markov1[curr][next] = (markov1[curr][next] || 0) + 1;
-
-                if (i < history.length - 2) {
-                    const next2 = history[i + 2];
-                    const pair = `${curr}_${next}`;
-                    if (!markov2[pair]) markov2[pair] = {};
-                    markov2[pair][next2] = (markov2[pair][next2] || 0) + 1;
-                }
-            }
-
-            // Compute Predicted Weights for Next Input
-            let predictedScores = {};
-            GRID_KEYS.forEach(k => predictedScores[k] = 0);
-
-            const totalInputs = history.length;
-            const validGridInputs = history.filter(k => k !== '0').length;
-
-            if (totalInputs > 0) {
-                // Base weight: Overall frequency (prior probability)
-                GRID_KEYS.forEach(k => {
-                    const freq = validGridInputs > 0 ? (counts[k] / validGridInputs) : 0;
-                    predictedScores[k] += freq * 1.0;
-                });
-
-                // Markov 1-step weight (Weight: 2.5)
-                const lastKey = history[history.length - 1];
-                if (lastKey && markov1[lastKey]) {
-                    let totalTrans = 0;
-                    Object.values(markov1[lastKey]).forEach(c => totalTrans += c);
-                    if (totalTrans > 0) {
-                        GRID_KEYS.forEach(k => {
-                            const count = markov1[lastKey][k] || 0;
-                            predictedScores[k] += (count / totalTrans) * 2.5;
-                        });
-                    }
-                }
-
-                // Markov 2-step weight (Weight: 4.0 - Highest priority for pattern recognition)
-                if (history.length >= 2) {
-                    const prev2 = history[history.length - 2];
-                    const prev1 = history[history.length - 1];
-                    const pair = `${prev2}_${prev1}`;
-
-                    if (markov2[pair]) {
-                        let totalTrans2 = 0;
-                        Object.values(markov2[pair]).forEach(c => totalTrans2 += c);
-                        if (totalTrans2 > 0) {
-                            GRID_KEYS.forEach(k => {
-                                const count = markov2[pair][k] || 0;
-                                predictedScores[k] += (count / totalTrans2) * 4.0;
-                            });
-                        }
-                    }
-                }
-            } else {
-                // Equal probability if no history
-                GRID_KEYS.forEach(k => predictedScores[k] = 1);
-            }
-
-            // Convert scores to percentages
-            let totalScore = 0;
-            GRID_KEYS.forEach(k => totalScore += predictedScores[k]);
-
-            let cellProbabilities = {};
-            GRID_KEYS.forEach(k => {
-                cellProbabilities[k] = totalScore > 0 ? (predictedScores[k] / totalScore) * 100 : (100 / 9);
-            });
-
-            // Calculate Row & Column Combined Probabilities
-            let rowProbabilities = [0, 0, 0];
-            let colProbabilities = [0, 0, 0];
-
-            GRID_KEYS.forEach(k => {
-                const pos = KEY_POSITIONS[k];
-                rowProbabilities[pos.row] += cellProbabilities[k];
-                colProbabilities[pos.col] += cellProbabilities[k];
-            });
-
-            updateUI(cellProbabilities, rowProbabilities, colProbabilities);
-        }
-
-        // Update Dashboard Elements
-        function updateUI(cellProbs = {}, rowProbs = [33.3, 33.3, 33.3], colProbs = [33.3, 33.3, 33.3]) {
-            // Default uniform probabilities if not calculated
-            if (Object.keys(cellProbs).length === 0) {
-                GRID_KEYS.forEach(k => cellProbs[k] = 100 / 9);
-            }
-
-            // Total inputs count
-            document.getElementById('total-count').textContent = history.length;
-
-            // Determine Row and Column Glow Highlights
-            // rowHighlight/colHighlight per row/col index: 'red' | 'yellow' | null
-            const rowHighlight = rowProbs.map(p => p > 80 ? 'red' : (p > 70 ? 'yellow' : null));
-            const colHighlight = colProbs.map(p => p > 80 ? 'red' : (p > 70 ? 'yellow' : null));
-
-            // Find TOP predicted cell
-            let maxProb = -1;
-            let topCell = null;
-            GRID_KEYS.forEach(k => {
-                if (cellProbs[k] > maxProb) {
-                    maxProb = cellProbs[k];
-                    topCell = k;
-                }
-            });
-
-            // Render Cell Data
-            GRID_KEYS.forEach(k => {
-                const countEl = document.getElementById(`count-${k}`);
-                const probEl = document.getElementById(`prob-${k}`);
-                const barEl = document.getElementById(`bar-${k}`);
-                const rankEl = document.getElementById(`rank-${k}`);
-                const starEl = document.getElementById(`star-${k}`);
-                const cellBtn = document.getElementById(`cell-${k}`);
-
-                if (countEl) countEl.textContent = counts[k] || 0;
-                
-                const probVal = cellProbs[k].toFixed(1);
-                if (probEl) {
-                    probEl.textContent = `${probVal}%`;
-                    probEl.className = `font-mono font-bold text-sm sm:text-base ${getProbColorClass(cellProbs[k])}`;
-                }
-
-                if (barEl) {
-                    barEl.style.width = `${Math.min(100, probVal)}%`;
-                }
-
-                // Cell Probability Star Marker (80%+: ★, 70%+: ☆)
-                if (starEl) {
-                    if (cellProbs[k] > 80) {
-                        starEl.textContent = '★';
-                        starEl.className = 'text-base sm:text-lg text-amber-400 font-bold animate-bounce drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]';
-                    } else if (cellProbs[k] > 70) {
-                        starEl.textContent = '☆';
-                        starEl.className = 'text-base sm:text-lg text-yellow-300 font-bold drop-shadow-[0_0_5px_rgba(253,224,71,0.6)]';
-                    } else {
-                        starEl.textContent = '';
-                        starEl.className = 'hidden';
-                    }
-                }
-
-                // Clear previous custom row/col glow styles
-                if (cellBtn) {
-                    cellBtn.classList.remove('glow-red', 'glow-yellow', 'grid-cell-glow-top', 'bg-emerald-950/20');
-
-                    // Check row/column high probability glow (Red > 80%, Yellow > 70%)
-                    const pos = KEY_POSITIONS[k];
-                    const rGlow = rowHighlight[pos.row];
-                    const cGlow = colHighlight[pos.col];
-
-                    if (rGlow === 'red' || cGlow === 'red') {
-                        cellBtn.classList.add('glow-red');
-                    } else if (rGlow === 'yellow' || cGlow === 'yellow') {
-                        cellBtn.classList.add('glow-yellow');
-                    }
-
-                    // Highlight Top Pick if no row/col glow overrides it
-                    if (history.length > 0 && k === topCell && maxProb > (100 / 9)) {
-                        if (rankEl) rankEl.classList.remove('hidden');
-                        if (!rGlow && !cGlow) {
-                            cellBtn.classList.add('grid-cell-glow-top', 'bg-emerald-950/20');
-                        }
-                    } else {
-                        if (rankEl) rankEl.classList.add('hidden');
-                    }
-                }
-            });
-
-            // Render Row Summaries with Color Highlights
-            rowProbs.forEach((prob, idx) => {
-                const pEl = document.getElementById(`row-prob-${idx}`);
-                const bEl = document.getElementById(`row-bar-${idx}`);
-                if (pEl) {
-                    pEl.textContent = `${prob.toFixed(1)}%`;
-                    pEl.className = prob > 80 ? 'text-xs sm:text-sm font-bold font-mono text-red-400 animate-pulse' : 
-                                   (prob > 70 ? 'text-xs sm:text-sm font-bold font-mono text-yellow-400' : 'text-xs sm:text-sm font-bold font-mono text-purple-400');
-                }
-                if (bEl) {
-                    bEl.style.height = `${Math.min(100, prob)}%`;
-                    bEl.className = prob > 80 ? 'bg-red-500 w-full h-0 transition-all duration-300' :
-                                   (prob > 70 ? 'bg-yellow-400 w-full h-0 transition-all duration-300' : 'bg-purple-400 w-full h-0 transition-all duration-300');
-                }
-            });
-
-            // Render Column Summaries with Color Highlights
-            colProbs.forEach((prob, idx) => {
-                const pEl = document.getElementById(`col-prob-${idx}`);
-                const bEl = document.getElementById(`col-bar-${idx}`);
-                if (pEl) {
-                    pEl.textContent = `${prob.toFixed(1)}%`;
-                    pEl.className = prob > 80 ? 'text-base font-bold font-mono text-red-400 animate-pulse' : 
-                                   (prob > 70 ? 'text-base font-bold font-mono text-yellow-400' : 'text-base font-bold font-mono text-cyan-400');
-                }
-                if (bEl) {
-                    bEl.style.width = `${Math.min(100, prob)}%`;
-                    bEl.className = prob > 80 ? 'bg-red-500 h-full w-0 transition-all duration-300' :
-                                   (prob > 70 ? 'bg-yellow-400 h-full w-0 transition-all duration-300' : 'bg-cyan-400 h-full w-0 transition-all duration-300');
-                }
-            });
-
-            // Top Summary Cards Update
-            const topCellKeyEl = document.getElementById('top-cell-key');
-            const topCellProbEl = document.getElementById('top-cell-prob');
-            if (topCellKeyEl && topCellProbEl) {
-                if (history.length > 0) {
-                    topCellKeyEl.textContent = topCell;
-                    topCellProbEl.textContent = `${maxProb.toFixed(1)}%`;
-                } else {
-                    topCellKeyEl.textContent = '-';
-                    topCellProbEl.textContent = '0.0%';
-                }
-            }
-
-            // Find Top Row & Col
-            let maxRowIdx = rowProbs.indexOf(Math.max(...rowProbs));
-            let maxColIdx = colProbs.indexOf(Math.max(...colProbs));
-
-            const topRowKeyEl = document.getElementById('top-row-key');
-            const topRowProbEl = document.getElementById('top-row-prob');
-            if (topRowKeyEl && topRowProbEl) {
-                if (history.length > 0) {
-                    topRowKeyEl.textContent = ['上段', '中段', '下段'][maxRowIdx];
-                    topRowProbEl.textContent = `${rowProbs[maxRowIdx].toFixed(1)}%`;
-                } else {
-                    topRowKeyEl.textContent = '-';
-                    topRowProbEl.textContent = '0.0%';
-                }
-            }
-
-            const topColKeyEl = document.getElementById('top-col-key');
-            const topColProbEl = document.getElementById('top-col-prob');
-            if (topColKeyEl && topColProbEl) {
-                if (history.length > 0) {
-                    topColKeyEl.textContent = ['左列', '中列', '右列'][maxColIdx];
-                    topColProbEl.textContent = `${colProbs[maxColIdx].toFixed(1)}%`;
-                } else {
-                    topColKeyEl.textContent = '-';
-                    topColProbEl.textContent = '0.0%';
-                }
-            }
-
-            // Render History List
-            renderHistoryLog();
-
-            // Render Simple Ranking
-            renderRankingList();
-        }
-
-        // Render Input History Log
-        function renderHistoryLog() {
-            const container = document.getElementById('history-container');
-            const countEl = document.getElementById('history-count');
-            if (!container) return;
-
-            countEl.textContent = `総計 ${history.length} 件`;
-
-            if (history.length === 0) {
-                container.innerHTML = `<span class="text-xs text-slate-500 italic">履歴がありません。マスまたはキーを押してください。</span>`;
-                return;
-            }
-
-            // Show recent inputs (latest on right)
-            const recent = history.slice(-30);
-            container.innerHTML = recent.map((k, idx) => {
-                const isSkip = k === '0';
-                const label = isSkip ? '0' : k;
-                const bgClass = isSkip ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-blue-600/20 text-blue-300 border-blue-500/40 font-bold';
-                
-                return `<span class="px-2.5 py-1 text-xs font-mono rounded-md border ${bgClass} animate-fade-in">${label}</span>`;
-            }).join('');
-
-            // Scroll to end automatically
-            container.scrollTop = container.scrollHeight;
-        }
-
-        // Render Frequency Ranking
-        function renderRankingList() {
-            const listEl = document.getElementById('ranking-list');
-            if (!listEl) return;
-
-            // Sort keys by count
-            const sorted = [...GRID_KEYS].sort((a, b) => counts[b] - counts[a]);
-            const total = history.filter(k => k !== '0').length;
-
-            listEl.innerHTML = sorted.slice(0, 6).map((k, i) => {
-                const pct = total > 0 ? ((counts[k] / total) * 100).toFixed(0) : 0;
-                return `
-                    <div class="bg-slate-800/40 rounded border border-slate-700/50 p-1.5 flex items-center justify-between text-xs">
-                        <span class="font-mono font-bold text-slate-300">${i+1}. [${k}]</span>
-                        <span class="text-slate-400 font-mono text-[11px]">${counts[k]}回 (${pct}%)</span>
-                    </div>
-                `;
-            }).join('');
-        }
-    </script>
+    function escapeHtml(str) {
+      if(!str) return '';
+      return String(str).replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+      });
+    }
+    function escapeJs(str) {
+      if(!str) return '';
+      return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+    }
+  </script>
 </body>
 </html>
